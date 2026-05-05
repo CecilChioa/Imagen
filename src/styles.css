@@ -644,6 +644,10 @@ label {
   align-items: end;
 }
 
+.batch-path-row {
+  grid-column: 1 / -1;
+}
+
 .batch-options input:not([type="checkbox"]) {
   height: 40px;
 }
@@ -659,11 +663,72 @@ label {
   flex: 1;
   flex-direction: column;
   gap: 8px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid #33343d;
   border-radius: 8px;
   background: #15161c;
   padding: 10px;
+}
+
+.batch-result-line {
+  display: grid;
+  grid-template-columns: 64px minmax(160px, 1fr) minmax(180px, 280px) 42px;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid #2f3040;
+  border-radius: 6px;
+  background: #1d1e27;
+  text-align: left;
+}
+
+.batch-result-status,
+.batch-result-prompt,
+.batch-result-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-result-status {
+  color: #b9bbc7;
+  font-size: 12px;
+}
+
+.batch-result-prompt {
+  color: #f2f2f4;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.batch-result-path {
+  color: #9ea4b8;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.batch-result-thumb {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #3a3d50;
+  border-radius: 4px;
+  background: #12131a;
+}
+
+.batch-result-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.batch-result-thumb span {
+  color: #7f859a;
+  font-size: 10px;
 }
 
 .batch-result-item {
