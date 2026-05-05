@@ -1,0 +1,55 @@
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-generate-image"
+description = "Allows generating images from the frontend."
+commands.allow = ["generate_image"]
+
+[[permission]]
+identifier = "allow-load-settings"
+description = "Allows loading settings from the frontend."
+commands.allow = ["load_settings"]
+
+[[permission]]
+identifier = "allow-settings-exists"
+description = "Allows checking whether a local settings file exists."
+commands.allow = ["settings_exists"]
+
+[[permission]]
+identifier = "allow-save-settings"
+description = "Allows saving settings from the frontend."
+commands.allow = ["save_settings"]
+
+[[permission]]
+identifier = "allow-save-generated-image"
+description = "Allows saving generated images from the frontend."
+commands.allow = ["save_generated_image"]
+
+[[permission]]
+identifier = "allow-pick-random-reference-image"
+description = "Allows picking a random reference image from a selected folder."
+commands.allow = ["pick_random_reference_image"]
+
+[[permission]]
+identifier = "allow-read-image-data-url"
+description = "Allows reading a selected local image for preview."
+commands.allow = ["read_image_data_url"]
+
+[[permission]]
+identifier = "allow-open-api-signup-url"
+description = "Allows opening the API signup URL in the default browser."
+commands.allow = ["open_api_signup_url"]
+
+[[permission]]
+identifier = "allow-open-qq-group-url"
+description = "Allows opening the QQ group URL in the default browser."
+commands.allow = ["open_qq_group_url"]
+
+[[permission]]
+identifier = "allow-batch-convert-images"
+description = "Allows running batch image format conversion from the frontend."
+commands.allow = ["batch_convert_images"]
+
+[default]
+description = "Default permissions for Imagen."
+permissions = ["allow-generate-image", "allow-load-settings", "allow-settings-exists", "allow-save-settings", "allow-save-generated-image", "allow-pick-random-reference-image", "allow-read-image-data-url", "allow-open-api-signup-url", "allow-open-qq-group-url", "allow-batch-convert-images"]
