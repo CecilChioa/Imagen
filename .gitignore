@@ -21,7 +21,6 @@ pnpm-debug.log*
 # --- Tauri / Rust ---
 src-tauri/target/
 target/
-Cargo.lock
 
 # --- Logs / Temp ---
 *.log

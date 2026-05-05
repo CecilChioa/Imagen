@@ -164,6 +164,10 @@ export default function App() {
   const [draftSettings, setDraftSettings] = useState<Settings>(defaultSettings);
   const [editingProfileId, setEditingProfileId] = useState(defaultApiProfile.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [apiSignupOpen, setApiSignupOpen] = useState(false);
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [localModelOpen, setLocalModelOpen] = useState(false);
   const [status, setStatus] = useState("就绪");
   const [logs, setLogs] = useState<string[]>(["等待生成任务..."]);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
@@ -198,6 +202,9 @@ export default function App() {
   const [convertTargetFormat, setConvertTargetFormat] = useState<ConvertTarget>("blp");
   const [convertRecursive, setConvertRecursive] = useState(true);
   const [convertKeepStructure, setConvertKeepStructure] = useState(true);
+  const [localModelName, setLocalModelName] = useState("本地模型 - Ollama");
+  const [localModelBaseUrl, setLocalModelBaseUrl] = useState("http://127.0.0.1:11434/v1");
+  const [localModelId, setLocalModelId] = useState("llava");
 
   const activeProfile = useMemo(
     () => settings.apiProfiles.find((p) => p.id === settings.activeApiProfileId) ?? settings.apiProfiles[0],
@@ -679,6 +686,34 @@ export default function App() {
     setStatus("设置已保存");
   }
 
+  async function onOpenApiSignup(provider: "pptokens" | "aifast" | "yunwu") {
+    try {
+      await invoke("open_api_signup_url", { provider });
+    } catch (error) {
+      setStatus(`打开链接失败：${String(error)}`);
+    }
+  }
+
+  function onConnectLocalModel() {
+    const profile = createApiProfile();
+    const nextProfile: ApiProfile = {
+      ...profile,
+      name: localModelName.trim() || "本地模型",
+      apiBaseUrl: localModelBaseUrl.trim() || "http://127.0.0.1:11434/v1",
+      model: localModelId.trim() || "llava",
+      apiKey: "",
+    };
+
+    setDraftSettings((current) => ({
+      ...current,
+      apiProfiles: [...current.apiProfiles, nextProfile],
+      activeApiProfileId: nextProfile.id,
+    }));
+    setEditingProfileId(nextProfile.id);
+    setLocalModelOpen(false);
+    setStatus("本地模型已接入，请点击保存设置生效");
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1024,7 +1059,100 @@ export default function App() {
               </div>
             </label>
             <div className="modal-actions">
+              <div className="modal-action-group">
+                <button type="button" className="ghost-button" onClick={() => setApiSignupOpen(true)}>获取 API</button>
+                <button type="button" className="ghost-button" onClick={() => setReleaseNotesOpen(true)}>更新提示</button>
+                <button type="button" className="ghost-button" onClick={() => setAboutOpen(true)}>关于软件</button>
+                <button type="button" className="ghost-button" onClick={() => setLocalModelOpen(true)}>接入本地模型</button>
+              </div>
               <button onClick={onSaveAllSettings}>保存设置</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {apiSignupOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal api-signup-modal" role="dialog" aria-modal="true">
+            <div className="modal-header">
+              <h2>获取 API</h2>
+              <button className="ghost-button" onClick={() => setApiSignupOpen(false)}>关闭</button>
+            </div>
+            <div className="api-provider-list">
+              <button className="ghost-button" onClick={() => onOpenApiSignup("pptokens")}>
+                <strong>PPtokens</strong>
+                <span>https://www.pptoken.org/?promo=AFFNV</span>
+              </button>
+              <button className="ghost-button" onClick={() => onOpenApiSignup("aifast")}>
+                <strong>速擎智能</strong>
+                <span>https://aifast.site/register?aff=6fbi</span>
+              </button>
+              <button className="ghost-button" onClick={() => onOpenApiSignup("yunwu")}>
+                <strong>云雾</strong>
+                <span>https://yunwu.ai/register?aff=3QLV</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {releaseNotesOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal" role="dialog" aria-modal="true">
+            <div className="modal-header">
+              <h2>更新提示</h2>
+              <button className="ghost-button" onClick={() => setReleaseNotesOpen(false)}>关闭</button>
+            </div>
+            <div className="about-content">
+              <strong>v1.1</strong>
+              <p>新增本地模型接口（可在设置中接入本地模型配置）。</p>
+              <strong>v1.2</strong>
+              <p>保存图片默认尺寸改为原始生图尺寸，可再选择 64x64/128x128/256x256/512x512/自定义。</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aboutOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal about-modal" role="dialog" aria-modal="true">
+            <div className="modal-header">
+              <h2>关于软件</h2>
+              <button className="ghost-button" onClick={() => setAboutOpen(false)}>关闭</button>
+            </div>
+            <div className="about-content">
+              <strong>Imagen</strong>
+              <p>作者：睡不醒</p>
+              <p>QQ：329209303</p>
+              <p>本软件为免费软件，禁止倒卖、二次收费或用于任何非法用途。</p>
+              <p>免责声明：本软件按“现状”提供，不对生成内容的合法性、准确性、适用性作任何明示或暗示担保。用户需自行承担因使用本软件产生的一切风险与责任，并确保其行为符合当地法律法规及第三方平台条款。</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {localModelOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal local-model-modal" role="dialog" aria-modal="true">
+            <div className="modal-header">
+              <h2>接入本地模型</h2>
+              <button className="ghost-button" onClick={() => setLocalModelOpen(false)}>关闭</button>
+            </div>
+            <div className="local-model-form">
+              <label>配置名称
+                <input value={localModelName} onChange={(e) => setLocalModelName(e.target.value)} />
+              </label>
+              <label>本地接口地址
+                <input value={localModelBaseUrl} onChange={(e) => setLocalModelBaseUrl(e.target.value)} placeholder="例如：http://127.0.0.1:11434/v1" />
+              </label>
+              <label>模型名称
+                <input value={localModelId} onChange={(e) => setLocalModelId(e.target.value)} placeholder="例如：llava" />
+              </label>
+              <p>说明：接入后会新增一条 API 配置，保存设置后在生成时自动使用当前选中的配置。</p>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setLocalModelOpen(false)}>取消</button>
+              <button type="button" onClick={onConnectLocalModel}>确认接入</button>
             </div>
           </div>
         </div>
