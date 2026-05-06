@@ -144,46 +144,51 @@ label {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 44px 1fr;
+  grid-template-rows: 52px 1fr;
   height: 100vh;
-  background: #17171c;
+  background:
+    radial-gradient(circle at top left, rgba(91, 92, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, #11141c 0%, #171922 45%, #101217 100%);
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  border-bottom: 1px solid #3a3221;
-  background: linear-gradient(#141820, #11141a);
-  padding: 6px 18px;
+  border-bottom: 1px solid rgba(123, 129, 160, 0.22);
+  background: rgba(15, 18, 25, 0.82);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+  padding: 8px 18px;
+  backdrop-filter: blur(18px);
 }
 
 .topbar-actions {
-  display: flex;
   width: 100%;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
-.topbar-actions button {
+.view-switcher {
+  overflow: hidden;
+  border: 1px solid rgba(116, 122, 158, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 3px;
+}
+
+.status-badge {
+  max-width: 280px;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.icon-button {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  font-size: 18px;
+.settings-action {
+  flex: 0 0 auto;
 }
 
 .qq-group-button {
-  display: grid;
-  margin-left: auto;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  padding: 0;
+  flex: 0 0 auto;
 }
 
 .qq-group-button img {
@@ -191,12 +196,6 @@ label {
   width: 22px;
   height: 22px;
   object-fit: contain;
-}
-
-.topbar-button {
-  height: 32px;
-  padding: 0 14px;
-  font-weight: 800;
 }
 
 .lab-layout {
@@ -209,17 +208,31 @@ label {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
   overflow: auto;
-  border-right: 2px solid #5a5a62;
-  background: #18181d;
-  padding: 16px 34px 20px;
+  border-right: 1px solid rgba(123, 129, 160, 0.22);
+  background: rgba(18, 21, 30, 0.78);
+  padding: 18px 30px 22px;
+  backdrop-filter: blur(18px);
+}
+
+.panel-section,
+.style-library-card,
+.batch-panel,
+.batch-result-list,
+.log-panel,
+.history-workspace {
+  border: 1px solid rgba(116, 122, 158, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(35, 39, 52, 0.78), rgba(20, 23, 32, 0.92));
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.18);
 }
 
 .panel-section {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 14px;
 }
 
 .panel-section h2,
@@ -529,7 +542,7 @@ label {
 
 .operation-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 150px;
+  grid-template-columns: minmax(260px, 1fr) 168px;
   align-items: center;
   gap: 12px;
 }
@@ -538,13 +551,15 @@ label {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 0;
+  min-width: 168px;
 }
 
 .save-size-control select {
-  width: 150px;
+  width: 168px;
   height: 40px;
+  padding: 0 42px 0 14px;
   font-weight: 900;
+  line-height: 40px;
 }
 
 .custom-size-row {
@@ -642,6 +657,84 @@ label {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.status-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 35;
+  display: inline-flex;
+  max-width: min(560px, calc(100vw - 48px));
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(116, 122, 158, 0.26);
+  border-radius: 999px;
+  background: rgba(18, 21, 30, 0.92);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  padding: 9px 16px;
+  color: #f4f6ff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+  pointer-events: none;
+  backdrop-filter: blur(16px);
+  animation: status-toast-in 160ms ease-out;
+}
+
+.status-toast-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #8e92a8;
+  box-shadow: 0 0 0 4px rgba(142, 146, 168, 0.14);
+}
+
+.status-toast-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-toast.success .status-toast-dot {
+  background: #43d17d;
+  box-shadow: 0 0 0 4px rgba(67, 209, 125, 0.14);
+}
+
+.status-toast.warning .status-toast-dot {
+  background: #ffb454;
+  box-shadow: 0 0 0 4px rgba(255, 180, 84, 0.16);
+}
+
+.status-toast.loading .status-toast-dot {
+  background: #6f7cff;
+  box-shadow: 0 0 0 4px rgba(111, 124, 255, 0.16);
+  animation: status-dot-pulse 1s ease-in-out infinite;
+}
+
+@keyframes status-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes status-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.72);
+    opacity: 0.58;
+  }
 }
 
 .log-panel {
@@ -1324,4 +1417,173 @@ label {
   .image-viewer-toolbar {
     grid-template-columns: 1fr;
   }
+}
+
+/* Mantine 接入后的统一视觉覆盖：保留原业务结构，只升级层级、卡片和结果区质感。 */
+.style-library-card {
+  border-color: rgba(116, 122, 158, 0.22);
+  border-radius: 14px;
+  background: rgba(15, 18, 26, 0.56);
+}
+
+.lab-workspace {
+  background:
+    radial-gradient(circle at top right, rgba(99, 97, 242, 0.14), transparent 30%),
+    rgba(12, 14, 20, 0.36);
+}
+
+.preview-stage {
+  border-color: rgba(116, 122, 158, 0.26);
+  border-radius: 20px;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%),
+    linear-gradient(180deg, rgba(30, 34, 46, 0.92), rgba(14, 17, 24, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.preview-stage.has-image {
+  border-color: rgba(99, 97, 242, 0.72);
+  box-shadow: 0 0 0 1px rgba(99, 97, 242, 0.18), 0 18px 54px rgba(57, 55, 190, 0.18);
+}
+
+.log-panel {
+  border-color: rgba(116, 122, 158, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(17, 20, 29, 0.98), rgba(11, 13, 19, 0.98));
+}
+
+.history-workspace {
+  padding: 10px;
+}
+
+.history-item,
+.batch-result-line {
+  border-color: rgba(116, 122, 158, 0.18);
+  border-radius: 12px;
+  background: rgba(29, 33, 45, 0.82);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.history-item:hover,
+.batch-result-line:hover {
+  border-color: rgba(99, 97, 242, 0.58);
+  background: rgba(39, 44, 61, 0.95);
+  transform: translateY(-1px);
+}
+
+.batch-layout {
+  background:
+    radial-gradient(circle at bottom left, rgba(74, 92, 255, 0.12), transparent 32%),
+    rgba(12, 14, 20, 0.34);
+}
+
+.batch-panel {
+  padding: 18px;
+}
+
+.batch-input {
+  border-radius: 14px;
+  background: rgba(11, 13, 19, 0.72);
+}
+
+.batch-result-list {
+  padding: 12px;
+}
+
+.batch-result-summary,
+.batch-results-empty {
+  border-color: rgba(116, 122, 158, 0.18);
+  border-radius: 14px;
+  background: rgba(12, 15, 22, 0.86);
+}
+
+.batch-log-panel {
+  height: 100%;
+  min-height: 360px;
+}
+
+.primary-action,
+.save-action {
+  border-color: rgba(116, 113, 255, 0.88);
+  background: linear-gradient(180deg, #7673ff, #5451dd);
+  box-shadow: 0 10px 24px rgba(84, 81, 221, 0.26);
+}
+
+.stop-action {
+  border-color: rgba(244, 98, 98, 0.58);
+  background: linear-gradient(180deg, #7a2e34, #522026);
+}
+
+.settings-api-grid {
+  --settings-api-card-height: 390px;
+  align-items: stretch;
+}
+
+.settings-api-grid .settings-card {
+  height: var(--settings-api-card-height);
+  min-height: var(--settings-api-card-height);
+  max-height: var(--settings-api-card-height);
+  overflow: hidden;
+}
+
+.settings-api-list-card {
+  overflow: hidden;
+}
+
+.settings-api-list-stack {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-profile-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+
+.settings-output-card {
+  margin-top: -8px;
+}
+
+.settings-output-row {
+  align-items: end;
+}
+
+.settings-output-row .mantine-InputWrapper-label {
+  position: relative;
+  top: -3px;
+  margin-bottom: 7px;
+  padding-left: 1px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.settings-modal-content {
+  border: 1px solid rgba(116, 122, 158, 0.28);
+  background: linear-gradient(180deg, rgba(28, 32, 43, 0.98), rgba(15, 18, 26, 0.98));
+}
+
+.settings-modal-body {
+  padding-top: 8px;
+}
+
+.settings-card,
+.settings-action-card {
+  border-color: rgba(116, 122, 158, 0.22) !important;
+  background: rgba(16, 19, 28, 0.72) !important;
+}
+
+.settings-action-card {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-action-card:hover {
+  border-color: rgba(99, 97, 242, 0.58) !important;
 }

@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useState } from "react";
+import { ActionIcon, Badge, Button, Group, Tooltip } from "@mantine/core";
 import { invoke } from "@tauri-apps/api/core";
 import qqGroupIcon from "../assets/quniconhigh.png";
 import { BatchConvertPage } from "../pages/BatchConvertPage";
@@ -284,16 +286,81 @@ export function AppShell(props: AppShellProps) {
     onConnectLocalModel: props.onConnectLocalModel,
   };
 
+  const statusTone = useMemo(() => {
+    if (/失败|错误|中止|停止/.test(props.status)) return "warning";
+    if (/成功|完成|已保存/.test(props.status)) return "success";
+    if (/生成中|转换中|处理中|保存中/.test(props.status)) return "loading";
+    return "info";
+  }, [props.status]);
+
+  const [statusToastVisible, setStatusToastVisible] = useState(Boolean(props.status && props.status !== "就绪"));
+
+  useEffect(() => {
+    if (!props.status || props.status === "就绪") {
+      setStatusToastVisible(false);
+      return undefined;
+    }
+
+    setStatusToastVisible(true);
+
+    if (statusTone === "loading") {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setStatusToastVisible(false), 3200);
+    return () => window.clearTimeout(timer);
+  }, [props.status, statusTone]);
+
   return (
     <div className="app-shell">
       <header className="topbar">
-        <nav className="topbar-actions">
-          <button className="icon-button" onClick={() => props.setSettingsOpen(true)} title="设置">⚙</button>
-          <button className={props.view === "single" ? "topbar-button active" : "topbar-button"} onClick={() => props.setView("single")}>单图生成</button>
-          <button className={props.view === "batch" ? "topbar-button active" : "topbar-button"} onClick={() => props.setView("batch")}>批量生成</button>
-          <button className={props.view === "convert" ? "topbar-button active" : "topbar-button"} onClick={() => props.setView("convert")}>批量转换</button>
-          <button className="qq-group-button" title="加入QQ群免费获取最新版本" onClick={() => invoke("open_qq_group_url")}><img src={qqGroupIcon} alt="加入QQ群免费获取最新版本" /></button>
-        </nav>
+        <Group className="topbar-actions" gap="xs" wrap="nowrap">
+          <Tooltip label="打开设置" position="bottom" withArrow>
+            <ActionIcon
+              aria-label="设置"
+              className="settings-action"
+              size="lg"
+              variant="light"
+              onClick={() => props.setSettingsOpen(true)}
+            >
+              ⚙
+            </ActionIcon>
+          </Tooltip>
+          <Button.Group className="view-switcher">
+            <Button
+              variant={props.view === "single" ? "filled" : "subtle"}
+              onClick={() => props.setView("single")}
+            >
+              单图生成
+            </Button>
+            <Button
+              variant={props.view === "batch" ? "filled" : "subtle"}
+              onClick={() => props.setView("batch")}
+            >
+              批量生成
+            </Button>
+            <Button
+              variant={props.view === "convert" ? "filled" : "subtle"}
+              onClick={() => props.setView("convert")}
+            >
+              批量转换
+            </Button>
+          </Button.Group>
+          <Badge className="status-badge" variant="light" color="gray">
+            {props.status}
+          </Badge>
+          <Tooltip label="加入QQ群免费获取最新版本" position="bottom" withArrow>
+            <ActionIcon
+              aria-label="加入QQ群免费获取最新版本"
+              className="qq-group-button"
+              size="lg"
+              variant="light"
+              onClick={() => invoke("open_qq_group_url")}
+            >
+              <img src={qqGroupIcon} alt="加入QQ群免费获取最新版本" />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </header>
 
       {props.view === "single" ? (
@@ -307,7 +374,12 @@ export function AppShell(props: AppShellProps) {
       <SettingsModal {...settingsModalProps} />
 
       {props.saveNotice && <div className="save-toast" role="status"><strong>保存成功</strong><span>{props.saveNotice.replace(/^保存成功：?/, "")}</span></div>}
-      <footer className="status-line">{props.status}</footer>
+      {statusToastVisible && (
+        <div className={`status-toast ${statusTone}`} role="status" aria-live="polite">
+          <span className="status-toast-dot" />
+          <span className="status-toast-text">{props.status}</span>
+        </div>
+      )}
     </div>
   );
 }
