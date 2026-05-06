@@ -1,5 +1,6 @@
 use std::{
   fs,
+  io::Write,
   path::{Path, PathBuf},
   process::Command,
   time::{SystemTime, UNIX_EPOCH},
@@ -7,6 +8,7 @@ use std::{
 
 use base64::Engine;
 use chrono::Local;
+use image::{codecs::tga::TgaEncoder, ColorType};
 use image_blp::{
   convert::{image_to_blp, blp_to_image, AlphaBits, BlpOldFormat, BlpTarget, FilterType},
   encode::save_blp,
@@ -157,6 +159,10 @@ pub struct BatchConvertRequest {
   pub alpha_mode: String,
   #[serde(default = "default_alpha_threshold")]
   pub alpha_threshold: u8,
+  #[serde(default = "default_tga_bits")]
+  pub tga_bits: u8,
+  #[serde(default = "default_true")]
+  pub tga_rle: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -587,7 +593,13 @@ fn convert_one_image(
   image = apply_alpha_mode(image, &request.alpha_mode, request.alpha_threshold);
 
   if target_format == "blp" {
-    let target = match request.blp_encoding.to_lowercase().as_str() {
+    let encoding = request.blp_encoding.to_lowercase();
+    // War3 BLP1 Raw1 palette can appear with swapped R/B channels when produced
+    // by generic pipelines; pre-swap fixes in-game/icon preview colors.
+    if encoding == "raw1" {
+      image = swap_red_blue_channels(image);
+    }
+    let target = match encoding.as_str() {
       "jpeg" => BlpTarget::Blp1(BlpOldFormat::Jpeg {
         has_alpha: request.blp_jpeg_alpha,
       }),
@@ -603,9 +615,137 @@ fn convert_one_image(
     )
     .map_err(|e| e.to_string())?;
     save_blp(&blp, output).map_err(|e| e.to_string())
+  } else if target_format == "tga" {
+    save_tga_with_options(&image, output, request.tga_bits, request.tga_rle)
   } else {
     image.save(output).map_err(|e| e.to_string())
   }
+}
+
+fn save_tga_with_options(
+  image: &image::DynamicImage,
+  output: &Path,
+  bits: u8,
+  rle: bool,
+) -> Result<(), String> {
+  match bits {
+    16 => save_tga16(image, output, rle),
+    24 => {
+      let rgb = image.to_rgb8();
+      let file = fs::File::create(output).map_err(|e| e.to_string())?;
+      let encoder = TgaEncoder::new(file);
+      let encoder = if rle { encoder } else { encoder.disable_rle() };
+      encoder
+        .encode(&rgb, rgb.width(), rgb.height(), ColorType::Rgb8)
+        .map_err(|e| e.to_string())
+    }
+    _ => {
+      let rgba = image.to_rgba8();
+      let file = fs::File::create(output).map_err(|e| e.to_string())?;
+      let encoder = TgaEncoder::new(file);
+      let encoder = if rle { encoder } else { encoder.disable_rle() };
+      encoder
+        .encode(&rgba, rgba.width(), rgba.height(), ColorType::Rgba8)
+        .map_err(|e| e.to_string())
+    }
+  }
+}
+
+fn save_tga16(image: &image::DynamicImage, output: &Path, rle: bool) -> Result<(), String> {
+  let rgba = image.to_rgba8();
+  let width = u16::try_from(rgba.width()).map_err(|_| "TGA width exceeds 65535".to_string())?;
+  let height = u16::try_from(rgba.height()).map_err(|_| "TGA height exceeds 65535".to_string())?;
+  let mut pixels = Vec::with_capacity(rgba.len() / 2);
+  for pixel in rgba.pixels() {
+    let r = (pixel[0] >> 3) as u16;
+    let g = (pixel[1] >> 3) as u16;
+    let b = (pixel[2] >> 3) as u16;
+    let a = if pixel[3] >= 128 { 1u16 } else { 0u16 };
+    let value = (a << 15) | (r << 10) | (g << 5) | b;
+    pixels.extend_from_slice(&value.to_le_bytes());
+  }
+
+  let mut file = fs::File::create(output).map_err(|e| e.to_string())?;
+  let mut header = [0u8; 18];
+  header[2] = if rle { 10 } else { 2 };
+  header[12..14].copy_from_slice(&width.to_le_bytes());
+  header[14..16].copy_from_slice(&height.to_le_bytes());
+  header[16] = 16;
+  header[17] = 0x20 | 1;
+  file.write_all(&header).map_err(|e| e.to_string())?;
+  if rle {
+    write_tga_rle_packets(&mut file, &pixels, 2)
+  } else {
+    file.write_all(&pixels).map_err(|e| e.to_string())
+  }
+}
+
+fn write_tga_rle_packets<W: Write>(
+  writer: &mut W,
+  bytes: &[u8],
+  bytes_per_pixel: usize,
+) -> Result<(), String> {
+  let pixel_count = bytes.len() / bytes_per_pixel;
+  let mut i = 0usize;
+  while i < pixel_count {
+    let current = pixel_slice(bytes, bytes_per_pixel, i);
+    let mut run_len = 1usize;
+    while i + run_len < pixel_count
+      && run_len < 128
+      && pixel_slice(bytes, bytes_per_pixel, i + run_len) == current
+    {
+      run_len += 1;
+    }
+
+    if run_len >= 2 {
+      writer
+        .write_all(&[0x80 | ((run_len - 1) as u8)])
+        .map_err(|e| e.to_string())?;
+      writer.write_all(current).map_err(|e| e.to_string())?;
+      i += run_len;
+      continue;
+    }
+
+    let raw_start = i;
+    i += 1;
+    while i < pixel_count {
+      let pixel = pixel_slice(bytes, bytes_per_pixel, i);
+      let mut next_run = 1usize;
+      while i + next_run < pixel_count
+        && next_run < 128
+        && pixel_slice(bytes, bytes_per_pixel, i + next_run) == pixel
+      {
+        next_run += 1;
+      }
+      if next_run >= 2 || i - raw_start >= 128 {
+        break;
+      }
+      i += 1;
+    }
+
+    let raw_len = i - raw_start;
+    writer
+      .write_all(&[((raw_len - 1) as u8)])
+      .map_err(|e| e.to_string())?;
+    writer
+      .write_all(&bytes[raw_start * bytes_per_pixel..i * bytes_per_pixel])
+      .map_err(|e| e.to_string())?;
+  }
+  Ok(())
+}
+
+fn pixel_slice(bytes: &[u8], bytes_per_pixel: usize, index: usize) -> &[u8] {
+  &bytes[index * bytes_per_pixel..(index + 1) * bytes_per_pixel]
+}
+
+fn swap_red_blue_channels(image: image::DynamicImage) -> image::DynamicImage {
+  let mut rgba = image.to_rgba8();
+  for pixel in rgba.pixels_mut() {
+    let r = pixel[0];
+    pixel[0] = pixel[2];
+    pixel[2] = r;
+  }
+  image::DynamicImage::ImageRgba8(rgba)
 }
 
 fn apply_alpha_mode(
@@ -680,6 +820,10 @@ fn default_alpha_mode() -> String {
 
 fn default_alpha_threshold() -> u8 {
   128
+}
+
+fn default_tga_bits() -> u8 {
+  32
 }
 
 fn settings_path() -> Result<PathBuf, String> {

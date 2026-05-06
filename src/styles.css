@@ -954,6 +954,44 @@ label {
   line-height: 1.1;
 }
 
+.tga-options {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid #383846;
+  border-radius: 8px;
+  background: #15151b;
+}
+
+.segmented-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.radio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #414150;
+  border-radius: 8px;
+  background: #1b1b23;
+  cursor: pointer;
+  user-select: none;
+}
+
+.radio-chip input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.radio-chip:has(input:checked) {
+  border-color: #6868ff;
+  background: #2f2f57;
+}
+
 .api-provider-list {
   display: grid;
   gap: 10px;

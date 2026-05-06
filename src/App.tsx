@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import qqGroupIcon from "./assets/quniconhigh.png";
@@ -26,6 +26,7 @@ type SaveButtonState = "idle" | "saving" | "saved" | "resave";
 type ViewMode = "single" | "batch" | "convert";
 type BatchMode = "queue" | "concurrent";
 type ConvertTarget = "png" | "tga" | "blp";
+type TgaBits = 16 | 24 | 32;
 
 const defaultApiProfile: ApiProfile = { id: "default", name: "PPtokens", apiKey: "", apiBaseUrl: "https://api.openai.com/v1", model: "gpt-image-2" };
 const defaultSettings: Settings = {
@@ -69,7 +70,7 @@ const normalizeSettings = (raw: Partial<Settings>): Settings => {
   const active = profiles.find((p) => p.id === raw.activeApiProfileId)?.id ?? profiles[0].id;
   return { ...defaultSettings, ...raw, apiProfiles: profiles, activeApiProfileId: active, positivePromptLibrary: raw.positivePromptLibrary ?? [], negativePromptLibrary: raw.negativePromptLibrary ?? [], history: (raw.history ?? []).slice(0, 10) };
 };
-const createApiProfile = (): ApiProfile => ({ ...defaultApiProfile, id: crypto.randomUUID(), name: "新 API" });
+const createApiProfile = (): ApiProfile => ({ ...defaultApiProfile, id: crypto.randomUUID(), name: "鏂?API" });
 const formatLog = (v: unknown) => JSON.stringify(v, null, 2);
 const replaceFragment = (source: string, fragments: string[], next: string) => [source, ...fragments].reduce((acc, f) => f ? acc.split(f).join("") : acc).replace(/\s*,\s*,+/g, ", ").replace(/^\s*,\s*|\s*,\s*$/g, "").trim().concat(next ? `${source.trim() ? ", " : ""}${next}` : "");
 
@@ -110,6 +111,8 @@ export default function App() {
   const [convertTargetFormat, setConvertTargetFormat] = useState<ConvertTarget>("blp");
   const [convertRecursive, setConvertRecursive] = useState(true);
   const [convertKeepStructure, setConvertKeepStructure] = useState(true);
+  const [convertTgaBits, setConvertTgaBits] = useState<TgaBits>(32);
+  const [convertTgaRle, setConvertTgaRle] = useState(true);
   const [localModelName, setLocalModelName] = useState("本地模型 - Ollama");
   const [localModelBaseUrl, setLocalModelBaseUrl] = useState("http://127.0.0.1:11434/v1");
   const [localModelId, setLocalModelId] = useState("llava");
@@ -181,16 +184,16 @@ export default function App() {
     try {
       if (concurrency <= 1) { for (const item of items) { if (generationRunIdRef.current !== runId) break; /* eslint-disable-next-line no-await-in-loop */ await runOne(item); } }
       else { let next = 0; await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => { while (generationRunIdRef.current === runId) { const item = items[next++]; if (!item) break; /* eslint-disable-next-line no-await-in-loop */ await runOne(item); } })); }
-    } finally { if (generationRunIdRef.current === runId) { setGenerationBusy(false); setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)); setStatus("批量生成完成"); } }
+    } finally { if (generationRunIdRef.current === runId) { setGenerationBusy(false); setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)); setStatus("鎵归噺鐢熸垚瀹屾垚"); } }
   };
 
-  const toggleConvertSourceFormat = (ext: string) => setConvertSourceFormats((c) => c.includes(ext) ? (c.length === 1 ? c : c.filter((i) => i !== ext)) : [...c, ext]);
+  const toggleConvertSourceFormat = (ext: string) => setConvertSourceFormats((c) => c.includes(ext) ? c.filter((i) => i !== ext) : [...c, ext]);
   const onBatchConvert = async () => {
     if (convertBusy) return;
     if (!convertSourceDir.trim() || !convertTargetDir.trim() || convertSourceFormats.length === 0) return setStatus("请完善转换参数");
-    setConvertBusy(true); setConvertLogs(["开始批量转换...", formatLog({ sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat })]);
+    setConvertBusy(true); setConvertLogs(["开始批量转换...", formatLog({ sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, tgaBits: convertTgaBits, tgaRle: convertTgaRle })]);
     try {
-      const result = await invoke<BatchConvertResult>("batch_convert_images", { request: { sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, recursive: convertRecursive, keepStructure: convertKeepStructure, blpEncoding: "raw1", blpAlphaBits: 8, blpJpegAlpha: true, blpMakeMipmaps: true, blpFilter: "nearest", alphaMode: "passthrough", alphaThreshold: 128 } });
+      const result = await invoke<BatchConvertResult>("batch_convert_images", { request: { sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, recursive: convertRecursive, keepStructure: convertKeepStructure, blpEncoding: "raw1", blpAlphaBits: 8, blpJpegAlpha: false, blpMakeMipmaps: true, blpFilter: "nearest", alphaMode: "passthrough", alphaThreshold: 128, tgaBits: convertTgaBits, tgaRle: convertTgaRle } });
       setConvertLogs((c) => [...c, `完成：成功 ${result.converted} / 失败 ${result.failed}`, ...result.errors.slice(0, 100)]);
     } catch (e) { setConvertLogs((c) => [...c, `失败：${String(e)}`]); setStatus(String(e)); } finally { setConvertBusy(false); }
   };
@@ -223,7 +226,7 @@ export default function App() {
           saveSize={saveSize} customWidth={customWidth} customHeight={customHeight} logs={generateLogs} elapsedSeconds={elapsedSeconds}
           onSettingsChange={setSettings} onApplyContentType={applyContentType} onApplyStylePreset={applyStylePreset}
           onChooseReferenceLibraryDir={onChooseReferenceLibraryDir}
-          onPickReferenceFromLibrary={async () => { const next = await pickReferenceFromLibrary(settings); await persistSettings(next); setStatus("已随机抽取参考图"); }}
+          onPickReferenceFromLibrary={async () => { const next = await pickReferenceFromLibrary(settings); await persistSettings(next); setStatus("宸查殢鏈烘娊鍙栧弬鑰冨浘"); }}
           onClearReferenceLibraryDir={async () => persistSettings({ ...settings, referenceLibraryDir: "" })}
           onChooseReferenceImage={onChooseReferenceImage} onChooseMaskImage={onChooseMaskImage}
           onSavePrompt={savePromptToLibrary} onDeletePrompt={deletePromptFromLibrary} onChoosePrompt={choosePromptFromLibrary}
@@ -245,11 +248,12 @@ export default function App() {
         <BatchConvertPage
           convertBusy={convertBusy} convertSourceDir={convertSourceDir} convertTargetDir={convertTargetDir}
           convertSourceFormats={convertSourceFormats} convertTargetFormat={convertTargetFormat} convertRecursive={convertRecursive}
-          convertKeepStructure={convertKeepStructure} logs={convertLogs}
+          convertKeepStructure={convertKeepStructure} convertTgaBits={convertTgaBits} convertTgaRle={convertTgaRle} logs={convertLogs}
           onChooseSourceDir={async () => { const d = await chooseDirectory("选择源文件夹"); if (d) setConvertSourceDir(d); }}
           onChooseTargetDir={async () => { const d = await chooseDirectory("选择目标文件夹"); if (d) setConvertTargetDir(d); }}
           onToggleSourceFormat={toggleConvertSourceFormat} onTargetFormatChange={setConvertTargetFormat}
           onRecursiveChange={setConvertRecursive} onKeepStructureChange={setConvertKeepStructure}
+          onTgaBitsChange={setConvertTgaBits} onTgaRleChange={setConvertTgaRle}
           onBatchConvert={onBatchConvert}
         />
       )}
@@ -268,7 +272,7 @@ export default function App() {
         onLocalModelIdChange={setLocalModelId} onConnectLocalModel={onConnectLocalModel}
       />
 
-      {saveNotice && <div className="save-toast" role="status"><strong>保存成功</strong><span>{saveNotice.replace(/^保存成功：?/, "")}</span></div>}
+      {saveNotice && <div className="save-toast" role="status"><strong>淇濆瓨鎴愬姛</strong><span>{saveNotice.replace(/^淇濆瓨鎴愬姛锛?/, "")}</span></div>}
       <footer className="status-line">{status}</footer>
     </div>
   );
