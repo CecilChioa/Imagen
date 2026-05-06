@@ -8,7 +8,13 @@ use std::{
 
 use base64::Engine;
 use chrono::Local;
-use image::{codecs::tga::TgaEncoder, ColorType};
+use image::{
+  codecs::{
+    png::{CompressionType as PngCompressionType, FilterType as PngFilterType, PngEncoder},
+    tga::TgaEncoder,
+  },
+  ColorType, ImageEncoder,
+};
 use image_blp::{
   convert::{image_to_blp, blp_to_image, AlphaBits, BlpOldFormat, BlpTarget, FilterType},
   encode::save_blp,
@@ -77,6 +83,40 @@ pub struct Settings {
   #[serde(default)]
   pub mask_image_path: String,
   #[serde(default)]
+  pub convert_source_dir: String,
+  #[serde(default)]
+  pub convert_target_dir: String,
+  #[serde(default = "default_convert_source_formats")]
+  pub convert_source_formats: Vec<String>,
+  #[serde(default = "default_convert_target_format")]
+  pub convert_target_format: String,
+  #[serde(default = "default_true")]
+  pub convert_recursive: bool,
+  #[serde(default = "default_true")]
+  pub convert_keep_structure: bool,
+  #[serde(default = "default_tga_bits")]
+  pub convert_tga_bits: u8,
+  #[serde(default = "default_true")]
+  pub convert_tga_rle: bool,
+  #[serde(default = "default_blp_encoding")]
+  pub convert_blp_encoding: String,
+  #[serde(default = "default_blp_alpha_bits")]
+  pub convert_blp_alpha_bits: u8,
+  #[serde(default)]
+  pub convert_blp_jpeg_alpha: bool,
+  #[serde(default = "default_true")]
+  pub convert_blp_make_mipmaps: bool,
+  #[serde(default = "default_blp_filter")]
+  pub convert_blp_filter: String,
+  #[serde(default = "default_alpha_mode")]
+  pub convert_alpha_mode: String,
+  #[serde(default = "default_alpha_threshold")]
+  pub convert_alpha_threshold: u8,
+  #[serde(default = "default_png_compression")]
+  pub convert_png_compression: String,
+  #[serde(default = "default_png_filter")]
+  pub convert_png_filter: String,
+  #[serde(default)]
   pub history: Vec<GenerationResult>,
 }
 
@@ -101,6 +141,23 @@ impl Default for Settings {
       reference_library_dir: String::new(),
       reference_image_path: String::new(),
       mask_image_path: String::new(),
+      convert_source_dir: String::new(),
+      convert_target_dir: String::new(),
+      convert_source_formats: default_convert_source_formats(),
+      convert_target_format: default_convert_target_format(),
+      convert_recursive: true,
+      convert_keep_structure: true,
+      convert_tga_bits: default_tga_bits(),
+      convert_tga_rle: true,
+      convert_blp_encoding: default_blp_encoding(),
+      convert_blp_alpha_bits: default_blp_alpha_bits(),
+      convert_blp_jpeg_alpha: false,
+      convert_blp_make_mipmaps: true,
+      convert_blp_filter: default_blp_filter(),
+      convert_alpha_mode: default_alpha_mode(),
+      convert_alpha_threshold: default_alpha_threshold(),
+      convert_png_compression: default_png_compression(),
+      convert_png_filter: default_png_filter(),
       history: Vec::new(),
     }
   }
@@ -163,6 +220,10 @@ pub struct BatchConvertRequest {
   pub tga_bits: u8,
   #[serde(default = "default_true")]
   pub tga_rle: bool,
+  #[serde(default = "default_png_compression")]
+  pub png_compression: String,
+  #[serde(default = "default_png_filter")]
+  pub png_filter: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -618,7 +679,7 @@ fn convert_one_image(
   } else if target_format == "tga" {
     save_tga_with_options(&image, output, request.tga_bits, request.tga_rle)
   } else {
-    image.save(output).map_err(|e| e.to_string())
+    save_png_with_options(&image, output, &request.png_compression, &request.png_filter)
   }
 }
 
@@ -678,6 +739,29 @@ fn save_tga16(image: &image::DynamicImage, output: &Path, rle: bool) -> Result<(
   } else {
     file.write_all(&pixels).map_err(|e| e.to_string())
   }
+}
+
+fn save_png_with_options(
+  image: &image::DynamicImage,
+  output: &Path,
+  compression: &str,
+  filter: &str,
+) -> Result<(), String> {
+  let rgba = image.to_rgba8();
+  let file = fs::File::create(output).map_err(|e| e.to_string())?;
+  let encoder = PngEncoder::new_with_quality(
+    file,
+    map_png_compression(compression),
+    map_png_filter(filter),
+  );
+  encoder
+    .write_image(
+      &rgba,
+      rgba.width(),
+      rgba.height(),
+      ColorType::Rgba8,
+    )
+    .map_err(|e| e.to_string())
 }
 
 fn write_tga_rle_packets<W: Write>(
@@ -824,6 +908,33 @@ fn default_alpha_threshold() -> u8 {
 
 fn default_tga_bits() -> u8 {
   32
+}
+
+fn default_png_compression() -> String {
+  "default".into()
+}
+
+fn default_png_filter() -> String {
+  "adaptive".into()
+}
+
+fn map_png_compression(value: &str) -> PngCompressionType {
+  match value.to_lowercase().as_str() {
+    "fast" => PngCompressionType::Fast,
+    "best" => PngCompressionType::Best,
+    _ => PngCompressionType::Default,
+  }
+}
+
+fn map_png_filter(value: &str) -> PngFilterType {
+  match value.to_lowercase().as_str() {
+    "none" => PngFilterType::NoFilter,
+    "sub" => PngFilterType::Sub,
+    "up" => PngFilterType::Up,
+    "avg" => PngFilterType::Avg,
+    "paeth" => PngFilterType::Paeth,
+    _ => PngFilterType::Adaptive,
+  }
 }
 
 fn settings_path() -> Result<PathBuf, String> {
@@ -1125,6 +1236,14 @@ fn default_content_type() -> String {
   "icon".into()
 }
 
+fn default_convert_source_formats() -> Vec<String> {
+  vec!["png".into()]
+}
+
+fn default_convert_target_format() -> String {
+  "blp".into()
+}
+
 fn migrate_legacy_settings(value: serde_json::Value) -> Result<Settings, String> {
   let defaults = Settings::default();
   let profile = ApiProfile {
@@ -1205,6 +1324,23 @@ fn migrate_legacy_settings(value: serde_json::Value) -> Result<Settings, String>
       .and_then(|v| v.as_str())
       .unwrap_or_default()
       .to_string(),
+    convert_source_dir: defaults.convert_source_dir,
+    convert_target_dir: defaults.convert_target_dir,
+    convert_source_formats: defaults.convert_source_formats,
+    convert_target_format: defaults.convert_target_format,
+    convert_recursive: defaults.convert_recursive,
+    convert_keep_structure: defaults.convert_keep_structure,
+    convert_tga_bits: defaults.convert_tga_bits,
+    convert_tga_rle: defaults.convert_tga_rle,
+    convert_blp_encoding: defaults.convert_blp_encoding,
+    convert_blp_alpha_bits: defaults.convert_blp_alpha_bits,
+    convert_blp_jpeg_alpha: defaults.convert_blp_jpeg_alpha,
+    convert_blp_make_mipmaps: defaults.convert_blp_make_mipmaps,
+    convert_blp_filter: defaults.convert_blp_filter,
+    convert_alpha_mode: defaults.convert_alpha_mode,
+    convert_alpha_threshold: defaults.convert_alpha_threshold,
+    convert_png_compression: defaults.convert_png_compression,
+    convert_png_filter: defaults.convert_png_filter,
     history: Vec::new(),
   })
 }

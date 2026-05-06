@@ -1,11 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import qqGroupIcon from "./assets/quniconhigh.png";
-import { SingleGeneratePage } from "./pages/SingleGeneratePage";
-import { BatchGeneratePage } from "./pages/BatchGeneratePage";
-import { BatchConvertPage } from "./pages/BatchConvertPage";
-import { SettingsModal } from "./pages/SettingsModal";
+import { AppShell } from "./components/AppShell";
+import { contentTypes, stylePresets } from "./config/presets";
 import "./styles.css";
 
 type ApiProfile = { id: string; name: string; apiKey: string; apiBaseUrl: string; model: string };
@@ -19,6 +16,11 @@ type Settings = {
   outputFormat: string; removeBackground: boolean; n: number; positivePrompt: string; negativePrompt: string;
   positivePromptLibrary: string[]; negativePromptLibrary: string[]; stylePreset: string; contentType: string;
   referenceLibraryDir: string; referenceImagePath: string; maskImagePath: string; history: GenerationResult[];
+  convertSourceDir: string; convertTargetDir: string; convertSourceFormats: string[]; convertTargetFormat: ConvertTarget;
+  convertRecursive: boolean; convertKeepStructure: boolean; convertTgaBits: TgaBits; convertTgaRle: boolean;
+  convertBlpEncoding: BlpEncoding; convertBlpAlphaBits: BlpAlphaBits; convertBlpJpegAlpha: boolean;
+  convertBlpMakeMipmaps: boolean; convertBlpFilter: ConvertFilter; convertAlphaMode: AlphaMode; convertAlphaThreshold: number;
+  convertPngCompression: PngCompression; convertPngFilter: PngFilter;
 };
 type BatchItem = { id: string; prompt: string; fullPrompt: string; negativePrompt: string; status: string; path?: string; error?: string; previewDataUrl?: string };
 type BatchConvertResult = { total: number; converted: number; failed: number; errors: string[] };
@@ -27,6 +29,12 @@ type ViewMode = "single" | "batch" | "convert";
 type BatchMode = "queue" | "concurrent";
 type ConvertTarget = "png" | "tga" | "blp";
 type TgaBits = 16 | 24 | 32;
+type BlpEncoding = "raw1" | "jpeg";
+type BlpAlphaBits = 0 | 1 | 4 | 8;
+type ConvertFilter = "nearest" | "triangle" | "catmullrom" | "gaussian" | "lanczos3";
+type AlphaMode = "passthrough" | "threshold" | "unpremultiply";
+type PngCompression = "default" | "fast" | "best";
+type PngFilter = "adaptive" | "none" | "sub" | "up" | "avg" | "paeth";
 
 const defaultApiProfile: ApiProfile = { id: "default", name: "PPtokens", apiKey: "", apiBaseUrl: "https://api.openai.com/v1", model: "gpt-image-2" };
 const defaultSettings: Settings = {
@@ -34,37 +42,12 @@ const defaultSettings: Settings = {
   size: "1024x1024", quality: "medium", outputFormat: "png", removeBackground: false, n: 1,
   positivePrompt: "", negativePrompt: "", positivePromptLibrary: [], negativePromptLibrary: [],
   stylePreset: "none", contentType: "icon", referenceLibraryDir: "", referenceImagePath: "", maskImagePath: "", history: [],
+  convertSourceDir: "", convertTargetDir: "", convertSourceFormats: ["png"], convertTargetFormat: "blp",
+  convertRecursive: true, convertKeepStructure: true, convertTgaBits: 32, convertTgaRle: true,
+  convertBlpEncoding: "raw1", convertBlpAlphaBits: 8, convertBlpJpegAlpha: false,
+  convertBlpMakeMipmaps: true, convertBlpFilter: "nearest", convertAlphaMode: "passthrough", convertAlphaThreshold: 128,
+  convertPngCompression: "default", convertPngFilter: "adaptive",
 };
-const stylePresets = [
-  { id: "none", name: "默认风格", prompt: "" },
-  { id: "dark", name: "暗黑奇幻", prompt: "dark fantasy, high contrast, dramatic lighting, arcane atmosphere" },
-  { id: "pixel", name: "像素艺术", prompt: "pixel art style, retro game texture, crisp edges" },
-  { id: "xianxia", name: "国风仙侠", prompt: "Chinese xianxia fantasy, elegant oriental style, mystical aura" },
-  { id: "ink", name: "中式水墨", prompt: "Chinese ink wash, restrained colors, brush texture" },
-  { id: "anime", name: "次元幻想", prompt: "anime fantasy style, cel shading, vivid magical effects" },
-  { id: "scifi", name: "科幻未来", prompt: "futuristic sci-fi style, neon accents, advanced technology details, cinematic lighting" },
-  { id: "mecha", name: "机甲工业", prompt: "mechanical industrial style, hard-surface design, metal texture, engineered structure" },
-  { id: "magic", name: "魔法史诗", prompt: "epic magic fantasy style, spell effects, mystical runes, dramatic composition" },
-  { id: "national", name: "国潮插画", prompt: "guochao illustration style, trendy Chinese aesthetics, bold colors, decorative pattern" },
-  { id: "watercolor", name: "清新水彩", prompt: "fresh watercolor style, soft pigment bleeding, paper texture, airy atmosphere" },
-  { id: "oilpaint", name: "厚涂手绘", prompt: "painterly hand-painted style, rich brushstrokes, layered color blocks, artistic texture" },
-  { id: "minimal", name: "极简扁平", prompt: "minimal flat design style, simplified geometry, clean silhouette, clear visual hierarchy" },
-  { id: "realism", name: "写实电影", prompt: "cinematic realism style, physically plausible lighting, filmic contrast, detailed textures" },
-];
-const contentTypes = [
-  { id: "icon", name: "图标", prompt: "icon-oriented composition, centered subject, clean silhouette, readable at small size" },
-  { id: "poster", name: "宣传图", prompt: "promotional key visual, cinematic composition, strong atmosphere" },
-  { id: "ui", name: "UI", prompt: "UI asset direction, clean hierarchy, production-ready interface component" },
-  { id: "character", name: "角色立绘", prompt: "character illustration direction, clear silhouette, expressive pose, clean focal hierarchy" },
-  { id: "scene", name: "场景概念", prompt: "environment concept art direction, depth layering, strong lighting mood, cinematic framing" },
-  { id: "product", name: "产品渲染", prompt: "product rendering direction, material accuracy, controlled reflections, studio lighting setup" },
-  { id: "cover", name: "封面主视觉", prompt: "cover key visual direction, strong center of interest, readable composition, brand-friendly style" },
-  { id: "banner", name: "横幅海报", prompt: "banner poster direction, horizontal composition, headline-safe negative space, high visual impact" },
-  { id: "social", name: "社媒配图", prompt: "social media artwork direction, eye-catching focal point, platform-friendly composition, clear contrast" },
-  { id: "texture", name: "材质贴图", prompt: "texture map direction, tiling-friendly detail, controlled noise, consistent material pattern" },
-  { id: "background", name: "背景壁纸", prompt: "wallpaper background direction, balanced composition, clean gradients or details, low visual clutter" },
-];
-
 const normalizeSettings = (raw: Partial<Settings>): Settings => {
   const profiles = raw.apiProfiles && raw.apiProfiles.length > 0 ? raw.apiProfiles : [defaultApiProfile];
   const active = profiles.find((p) => p.id === raw.activeApiProfileId)?.id ?? profiles[0].id;
@@ -105,22 +88,70 @@ export default function App() {
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [batchMode, setBatchMode] = useState<BatchMode>("queue");
   const [batchConcurrency, setBatchConcurrency] = useState(5);
-  const [convertSourceDir, setConvertSourceDir] = useState("");
-  const [convertTargetDir, setConvertTargetDir] = useState("");
-  const [convertSourceFormats, setConvertSourceFormats] = useState<string[]>(["png"]);
-  const [convertTargetFormat, setConvertTargetFormat] = useState<ConvertTarget>("blp");
-  const [convertRecursive, setConvertRecursive] = useState(true);
-  const [convertKeepStructure, setConvertKeepStructure] = useState(true);
-  const [convertTgaBits, setConvertTgaBits] = useState<TgaBits>(32);
-  const [convertTgaRle, setConvertTgaRle] = useState(true);
+  const [convertSourceDir, setConvertSourceDir] = useState(defaultSettings.convertSourceDir);
+  const [convertTargetDir, setConvertTargetDir] = useState(defaultSettings.convertTargetDir);
+  const [convertSourceFormats, setConvertSourceFormats] = useState<string[]>(defaultSettings.convertSourceFormats);
+  const [convertTargetFormat, setConvertTargetFormat] = useState<ConvertTarget>(defaultSettings.convertTargetFormat);
+  const [convertRecursive, setConvertRecursive] = useState(defaultSettings.convertRecursive);
+  const [convertKeepStructure, setConvertKeepStructure] = useState(defaultSettings.convertKeepStructure);
+  const [convertTgaBits, setConvertTgaBits] = useState<TgaBits>(defaultSettings.convertTgaBits);
+  const [convertTgaRle, setConvertTgaRle] = useState(defaultSettings.convertTgaRle);
+  const [convertBlpEncoding, setConvertBlpEncoding] = useState<BlpEncoding>(defaultSettings.convertBlpEncoding);
+  const [convertBlpAlphaBits, setConvertBlpAlphaBits] = useState<BlpAlphaBits>(defaultSettings.convertBlpAlphaBits);
+  const [convertBlpJpegAlpha, setConvertBlpJpegAlpha] = useState(defaultSettings.convertBlpJpegAlpha);
+  const [convertBlpMakeMipmaps, setConvertBlpMakeMipmaps] = useState(defaultSettings.convertBlpMakeMipmaps);
+  const [convertBlpFilter, setConvertBlpFilter] = useState<ConvertFilter>(defaultSettings.convertBlpFilter);
+  const [convertAlphaMode, setConvertAlphaMode] = useState<AlphaMode>(defaultSettings.convertAlphaMode);
+  const [convertAlphaThreshold, setConvertAlphaThreshold] = useState(defaultSettings.convertAlphaThreshold);
+  const [convertPngCompression, setConvertPngCompression] = useState<PngCompression>(defaultSettings.convertPngCompression);
+  const [convertPngFilter, setConvertPngFilter] = useState<PngFilter>(defaultSettings.convertPngFilter);
   const [localModelName, setLocalModelName] = useState("本地模型 - Ollama");
   const [localModelBaseUrl, setLocalModelBaseUrl] = useState("http://127.0.0.1:11434/v1");
   const [localModelId, setLocalModelId] = useState("llava");
 
   const activeProfile = useMemo(() => settings.apiProfiles.find((p) => p.id === settings.activeApiProfileId) ?? settings.apiProfiles[0], [settings]);
   const editingProfile = useMemo(() => draftSettings.apiProfiles.find((p) => p.id === editingProfileId) ?? draftSettings.apiProfiles[0], [draftSettings, editingProfileId]);
+  const applyConvertSettings = (next: Settings) => {
+    setConvertSourceDir(next.convertSourceDir);
+    setConvertTargetDir(next.convertTargetDir);
+    setConvertSourceFormats(next.convertSourceFormats);
+    setConvertTargetFormat(next.convertTargetFormat);
+    setConvertRecursive(next.convertRecursive);
+    setConvertKeepStructure(next.convertKeepStructure);
+    setConvertTgaBits(next.convertTgaBits);
+    setConvertTgaRle(next.convertTgaRle);
+    setConvertBlpEncoding(next.convertBlpEncoding);
+    setConvertBlpAlphaBits(next.convertBlpAlphaBits);
+    setConvertBlpJpegAlpha(next.convertBlpJpegAlpha);
+    setConvertBlpMakeMipmaps(next.convertBlpMakeMipmaps);
+    setConvertBlpFilter(next.convertBlpFilter);
+    setConvertAlphaMode(next.convertAlphaMode);
+    setConvertAlphaThreshold(next.convertAlphaThreshold);
+    setConvertPngCompression(next.convertPngCompression);
+    setConvertPngFilter(next.convertPngFilter);
+  };
+  const currentConvertSettings = (): Settings => ({
+    ...settings,
+    convertSourceDir,
+    convertTargetDir,
+    convertSourceFormats,
+    convertTargetFormat,
+    convertRecursive,
+    convertKeepStructure,
+    convertTgaBits,
+    convertTgaRle,
+    convertBlpEncoding,
+    convertBlpAlphaBits,
+    convertBlpJpegAlpha,
+    convertBlpMakeMipmaps,
+    convertBlpFilter,
+    convertAlphaMode,
+    convertAlphaThreshold,
+    convertPngCompression,
+    convertPngFilter,
+  });
 
-  useEffect(() => { invoke<Settings>("load_settings").then((v) => { const next = normalizeSettings(v); setSettings(next); setDraftSettings(next); setEditingProfileId(next.activeApiProfileId); setHistory(next.history); }).catch(() => setSettingsOpen(true)); }, []);
+  useEffect(() => { invoke<Settings>("load_settings").then((v) => { const next = normalizeSettings(v); setSettings(next); setDraftSettings(next); setEditingProfileId(next.activeApiProfileId); setHistory(next.history); applyConvertSettings(next); }).catch(() => setSettingsOpen(true)); }, []);
   useEffect(() => { if (!generationBusy || generationStartedAt == null) return; const t = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - generationStartedAt) / 1000)), 250); return () => window.clearInterval(t); }, [generationBusy, generationStartedAt]);
   useEffect(() => { if (!saveNotice) return; const t = window.setTimeout(() => setSaveNotice(""), 2200); return () => window.clearTimeout(t); }, [saveNotice]);
   useEffect(() => { if (!status) return; const t = window.setTimeout(() => setStatus(""), 5000); return () => window.clearTimeout(t); }, [status]);
@@ -191,9 +222,11 @@ export default function App() {
   const onBatchConvert = async () => {
     if (convertBusy) return;
     if (!convertSourceDir.trim() || !convertTargetDir.trim() || convertSourceFormats.length === 0) return setStatus("请完善转换参数");
-    setConvertBusy(true); setConvertLogs(["开始批量转换...", formatLog({ sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, tgaBits: convertTgaBits, tgaRle: convertTgaRle })]);
+    const nextSettings = currentConvertSettings();
+    await persistSettings(nextSettings);
+    setConvertBusy(true); setConvertLogs(["开始批量转换...", formatLog({ sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, tgaBits: convertTgaBits, tgaRle: convertTgaRle, blpEncoding: convertBlpEncoding, blpAlphaBits: convertBlpAlphaBits, blpJpegAlpha: convertBlpJpegAlpha, blpMakeMipmaps: convertBlpMakeMipmaps, blpFilter: convertBlpFilter, alphaMode: convertAlphaMode, alphaThreshold: convertAlphaThreshold, pngCompression: convertPngCompression, pngFilter: convertPngFilter })]);
     try {
-      const result = await invoke<BatchConvertResult>("batch_convert_images", { request: { sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, recursive: convertRecursive, keepStructure: convertKeepStructure, blpEncoding: "raw1", blpAlphaBits: 8, blpJpegAlpha: false, blpMakeMipmaps: true, blpFilter: "nearest", alphaMode: "passthrough", alphaThreshold: 128, tgaBits: convertTgaBits, tgaRle: convertTgaRle } });
+      const result = await invoke<BatchConvertResult>("batch_convert_images", { request: { sourceDir: convertSourceDir, targetDir: convertTargetDir, sourceFormats: convertSourceFormats, targetFormat: convertTargetFormat, recursive: convertRecursive, keepStructure: convertKeepStructure, blpEncoding: convertBlpEncoding, blpAlphaBits: convertBlpAlphaBits, blpJpegAlpha: convertBlpJpegAlpha, blpMakeMipmaps: convertBlpMakeMipmaps, blpFilter: convertBlpFilter, alphaMode: convertAlphaMode, alphaThreshold: convertAlphaThreshold, tgaBits: convertTgaBits, tgaRle: convertTgaRle, pngCompression: convertPngCompression, pngFilter: convertPngFilter } });
       setConvertLogs((c) => [...c, `完成：成功 ${result.converted} / 失败 ${result.failed}`, ...result.errors.slice(0, 100)]);
     } catch (e) { setConvertLogs((c) => [...c, `失败：${String(e)}`]); setStatus(String(e)); } finally { setConvertBusy(false); }
   };
@@ -207,73 +240,117 @@ export default function App() {
   const onConnectLocalModel = () => { const p = createApiProfile(); const next = { ...p, name: localModelName.trim() || "本地模型", apiBaseUrl: localModelBaseUrl.trim() || "http://127.0.0.1:11434/v1", model: localModelId.trim() || "llava", apiKey: "" }; setDraftSettings((c) => ({ ...c, apiProfiles: [...c.apiProfiles, next], activeApiProfileId: next.id })); setEditingProfileId(next.id); setLocalModelOpen(false); setStatus("本地模型已接入，请保存设置"); };
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <nav className="topbar-actions">
-          <button className="icon-button" onClick={() => setSettingsOpen(true)} title="设置">⚙</button>
-          <button className={view === "single" ? "topbar-button active" : "topbar-button"} onClick={() => setView("single")}>单图生成</button>
-          <button className={view === "batch" ? "topbar-button active" : "topbar-button"} onClick={() => setView("batch")}>批量生成</button>
-          <button className={view === "convert" ? "topbar-button active" : "topbar-button"} onClick={() => setView("convert")}>批量转换</button>
-          <button className="qq-group-button" title="加入QQ群免费获取最新版本" onClick={() => invoke("open_qq_group_url")}><img src={qqGroupIcon} alt="加入QQ群免费获取最新版本" /></button>
-        </nav>
-      </header>
-
-      {view === "single" ? (
-        <SingleGeneratePage
-          settings={settings} stylePresets={stylePresets} contentTypes={contentTypes}
-          referencePreviewSrc={referencePreviewSrc} maskPreviewSrc={maskPreviewSrc} history={history as any}
-          previewSrc={previewSrc} generationBusy={generationBusy} saveButtonState={saveButtonState}
-          saveSize={saveSize} customWidth={customWidth} customHeight={customHeight} logs={generateLogs} elapsedSeconds={elapsedSeconds}
-          onSettingsChange={setSettings} onApplyContentType={applyContentType} onApplyStylePreset={applyStylePreset}
-          onChooseReferenceLibraryDir={onChooseReferenceLibraryDir}
-          onPickReferenceFromLibrary={async () => { const next = await pickReferenceFromLibrary(settings); await persistSettings(next); setStatus("宸查殢鏈烘娊鍙栧弬鑰冨浘"); }}
-          onClearReferenceLibraryDir={async () => persistSettings({ ...settings, referenceLibraryDir: "" })}
-          onChooseReferenceImage={onChooseReferenceImage} onChooseMaskImage={onChooseMaskImage}
-          onSavePrompt={savePromptToLibrary} onDeletePrompt={deletePromptFromLibrary} onChoosePrompt={choosePromptFromLibrary}
-          onApplyHistory={(item: any) => { const req = (item.request as Record<string, unknown>) ?? {}; setSettings((c) => ({ ...c, positivePrompt: typeof req.positive_prompt === "string" ? req.positive_prompt : item.prompt, negativePrompt: typeof req.negative_prompt === "string" ? req.negative_prompt : "" })); }}
-          onGenerate={onGenerate} onSavePreview={onSavePreview} onSaveSizeChange={setSaveSize}
-          onCustomWidthChange={setCustomWidth} onCustomHeightChange={setCustomHeight}
-        />
-      ) : view === "batch" ? (
-        <BatchGeneratePage
-          generationBusy={generationBusy} elapsedSeconds={elapsedSeconds}
-          batchPromptText={batchPromptText} batchMode={batchMode} batchConcurrency={batchConcurrency}
-          saveSize={saveSize} logs={generateLogs} batchItems={batchItems as any}
-          onBatchPromptTextChange={setBatchPromptText} onBatchModeChange={setBatchMode}
-          onBatchConcurrencyChange={setBatchConcurrency} onSaveSizeChange={setSaveSize}
-          onBatchGenerate={onBatchGenerate}
-          onBatchItemApply={(item: any) => { setView("single"); setSettings((c) => ({ ...c, positivePrompt: item.fullPrompt, negativePrompt: item.negativePrompt })); }}
-        />
-      ) : (
-        <BatchConvertPage
-          convertBusy={convertBusy} convertSourceDir={convertSourceDir} convertTargetDir={convertTargetDir}
-          convertSourceFormats={convertSourceFormats} convertTargetFormat={convertTargetFormat} convertRecursive={convertRecursive}
-          convertKeepStructure={convertKeepStructure} convertTgaBits={convertTgaBits} convertTgaRle={convertTgaRle} logs={convertLogs}
-          onChooseSourceDir={async () => { const d = await chooseDirectory("选择源文件夹"); if (d) setConvertSourceDir(d); }}
-          onChooseTargetDir={async () => { const d = await chooseDirectory("选择目标文件夹"); if (d) setConvertTargetDir(d); }}
-          onToggleSourceFormat={toggleConvertSourceFormat} onTargetFormatChange={setConvertTargetFormat}
-          onRecursiveChange={setConvertRecursive} onKeepStructureChange={setConvertKeepStructure}
-          onTgaBitsChange={setConvertTgaBits} onTgaRleChange={setConvertTgaRle}
-          onBatchConvert={onBatchConvert}
-        />
-      )}
-
-      <SettingsModal
-        open={settingsOpen} draftSettings={draftSettings as any} editingProfileId={editingProfileId}
-        editingProfile={editingProfile as any} localModelName={localModelName} localModelBaseUrl={localModelBaseUrl}
-        localModelId={localModelId} apiSignupOpen={apiSignupOpen} releaseNotesOpen={releaseNotesOpen}
-        aboutOpen={aboutOpen} localModelOpen={localModelOpen} onClose={() => setSettingsOpen(false)}
-        onSelectProfile={(id) => { setEditingProfileId(id); setDraftSettings({ ...draftSettings, activeApiProfileId: id }); }}
-        onDraftSettingsChange={setDraftSettings as any} onAddProfile={addProfile} onUpdateEditingProfile={updateEditingProfile}
-        onDeleteProfile={deleteProfile} onChooseOutputDir={onChooseOutputDir} onSaveAllSettings={onSaveAllSettings}
-        onSetApiSignupOpen={setApiSignupOpen} onSetReleaseNotesOpen={setReleaseNotesOpen} onSetAboutOpen={setAboutOpen}
-        onSetLocalModelOpen={setLocalModelOpen} onOpenApiSignup={onOpenApiSignup}
-        onLocalModelNameChange={setLocalModelName} onLocalModelBaseUrlChange={setLocalModelBaseUrl}
-        onLocalModelIdChange={setLocalModelId} onConnectLocalModel={onConnectLocalModel}
-      />
-
-      {saveNotice && <div className="save-toast" role="status"><strong>淇濆瓨鎴愬姛</strong><span>{saveNotice.replace(/^淇濆瓨鎴愬姛锛?/, "")}</span></div>}
-      <footer className="status-line">{status}</footer>
-    </div>
+    <AppShell
+      view={view}
+      setView={setView}
+      settings={settings}
+      setSettings={setSettings}
+      draftSettings={draftSettings}
+      setDraftSettings={setDraftSettings}
+      settingsOpen={settingsOpen}
+      setSettingsOpen={setSettingsOpen}
+      editingProfileId={editingProfileId}
+      setEditingProfileId={setEditingProfileId}
+      editingProfile={editingProfile}
+      apiSignupOpen={apiSignupOpen}
+      releaseNotesOpen={releaseNotesOpen}
+      aboutOpen={aboutOpen}
+      localModelOpen={localModelOpen}
+      setApiSignupOpen={setApiSignupOpen}
+      setReleaseNotesOpen={setReleaseNotesOpen}
+      setAboutOpen={setAboutOpen}
+      setLocalModelOpen={setLocalModelOpen}
+      localModelName={localModelName}
+      localModelBaseUrl={localModelBaseUrl}
+      localModelId={localModelId}
+      setLocalModelName={setLocalModelName}
+      setLocalModelBaseUrl={setLocalModelBaseUrl}
+      setLocalModelId={setLocalModelId}
+      stylePresets={stylePresets}
+      contentTypes={contentTypes}
+      referencePreviewSrc={referencePreviewSrc}
+      maskPreviewSrc={maskPreviewSrc}
+      history={history}
+      previewSrc={previewSrc}
+      generationBusy={generationBusy}
+      saveButtonState={saveButtonState}
+      saveSize={saveSize}
+      customWidth={customWidth}
+      customHeight={customHeight}
+      generateLogs={generateLogs}
+      convertLogs={convertLogs}
+      elapsedSeconds={elapsedSeconds}
+      saveNotice={saveNotice}
+      status={status}
+      batchPromptText={batchPromptText}
+      batchMode={batchMode}
+      batchConcurrency={batchConcurrency}
+      batchItems={batchItems}
+      convertBusy={convertBusy}
+      convertSourceDir={convertSourceDir}
+      convertTargetDir={convertTargetDir}
+      convertSourceFormats={convertSourceFormats}
+      convertTargetFormat={convertTargetFormat}
+      convertRecursive={convertRecursive}
+      convertKeepStructure={convertKeepStructure}
+      convertTgaBits={convertTgaBits}
+      convertTgaRle={convertTgaRle}
+      convertBlpEncoding={convertBlpEncoding}
+      convertBlpAlphaBits={convertBlpAlphaBits}
+      convertBlpJpegAlpha={convertBlpJpegAlpha}
+      convertBlpMakeMipmaps={convertBlpMakeMipmaps}
+      convertBlpFilter={convertBlpFilter}
+      convertAlphaMode={convertAlphaMode}
+      convertAlphaThreshold={convertAlphaThreshold}
+      convertPngCompression={convertPngCompression}
+      convertPngFilter={convertPngFilter}
+      onSettingsChange={setSettings}
+      onApplyContentType={applyContentType}
+      onApplyStylePreset={applyStylePreset}
+      onChooseReferenceLibraryDir={onChooseReferenceLibraryDir}
+      onPickReferenceFromLibrary={async () => { const next = await pickReferenceFromLibrary(settings); await persistSettings(next); setStatus("宸查殢鏈烘娊鍙栧弬鑰冨浘"); }}
+      onClearReferenceLibraryDir={async () => persistSettings({ ...settings, referenceLibraryDir: "" })}
+      onChooseReferenceImage={onChooseReferenceImage}
+      onChooseMaskImage={onChooseMaskImage}
+      onSavePrompt={savePromptToLibrary}
+      onDeletePrompt={deletePromptFromLibrary}
+      onChoosePrompt={choosePromptFromLibrary}
+      onApplyHistory={(item: any) => { const req = (item.request as Record<string, unknown>) ?? {}; setSettings((c) => ({ ...c, positivePrompt: typeof req.positive_prompt === "string" ? req.positive_prompt : item.prompt, negativePrompt: typeof req.negative_prompt === "string" ? req.negative_prompt : "" })); }}
+      onGenerate={onGenerate}
+      onSavePreview={onSavePreview}
+      onSaveSizeChange={setSaveSize}
+      onCustomWidthChange={setCustomWidth}
+      onCustomHeightChange={setCustomHeight}
+      onBatchPromptTextChange={setBatchPromptText}
+      onBatchModeChange={setBatchMode}
+      onBatchConcurrencyChange={setBatchConcurrency}
+      onBatchGenerate={onBatchGenerate}
+      onBatchItemApply={(item: any) => { setView("single"); setSettings((c) => ({ ...c, positivePrompt: item.fullPrompt, negativePrompt: item.negativePrompt })); }}
+      onChooseConvertSourceDir={async () => { const d = await chooseDirectory("选择源文件夹"); if (d) { setConvertSourceDir(d); await persistSettings({ ...currentConvertSettings(), convertSourceDir: d }); } }}
+      onChooseConvertTargetDir={async () => { const d = await chooseDirectory("选择目标文件夹"); if (d) { setConvertTargetDir(d); await persistSettings({ ...currentConvertSettings(), convertTargetDir: d }); } }}
+      onToggleSourceFormat={toggleConvertSourceFormat}
+      onTargetFormatChange={setConvertTargetFormat}
+      onRecursiveChange={setConvertRecursive}
+      onKeepStructureChange={setConvertKeepStructure}
+      onTgaBitsChange={setConvertTgaBits}
+      onTgaRleChange={setConvertTgaRle}
+      onBlpEncodingChange={setConvertBlpEncoding}
+      onBlpAlphaBitsChange={setConvertBlpAlphaBits}
+      onBlpJpegAlphaChange={setConvertBlpJpegAlpha}
+      onBlpMakeMipmapsChange={setConvertBlpMakeMipmaps}
+      onBlpFilterChange={setConvertBlpFilter}
+      onAlphaModeChange={setConvertAlphaMode}
+      onAlphaThresholdChange={setConvertAlphaThreshold}
+      onPngCompressionChange={setConvertPngCompression}
+      onPngFilterChange={setConvertPngFilter}
+      onBatchConvert={onBatchConvert}
+      onAddProfile={addProfile}
+      onUpdateEditingProfile={updateEditingProfile}
+      onDeleteProfile={deleteProfile}
+      onChooseOutputDir={onChooseOutputDir}
+      onSaveAllSettings={onSaveAllSettings}
+      onOpenApiSignup={onOpenApiSignup}
+      onConnectLocalModel={onConnectLocalModel}
+    />
   );
 }
