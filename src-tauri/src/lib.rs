@@ -48,6 +48,8 @@ impl Default for ApiProfile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+  #[serde(default = "default_schema_version")]
+  pub schema_version: u32,
   #[serde(default = "default_api_profiles")]
   pub api_profiles: Vec<ApiProfile>,
   #[serde(default = "default_active_api_profile_id")]
@@ -124,6 +126,7 @@ impl Default for Settings {
   fn default() -> Self {
     let profile = ApiProfile::default();
     Self {
+      schema_version: default_schema_version(),
       api_profiles: vec![profile.clone()],
       active_api_profile_id: profile.id,
       output_dir: "outputs".into(),
@@ -1208,6 +1211,10 @@ fn default_api_profiles() -> Vec<ApiProfile> {
   vec![ApiProfile::default()]
 }
 
+fn default_schema_version() -> u32 {
+  1
+}
+
 fn default_active_api_profile_id() -> String {
   ApiProfile::default().id
 }
@@ -1267,6 +1274,7 @@ fn migrate_legacy_settings(value: serde_json::Value) -> Result<Settings, String>
   };
 
   Ok(Settings {
+    schema_version: default_schema_version(),
     api_profiles: vec![profile.clone()],
     active_api_profile_id: profile.id,
     output_dir: value

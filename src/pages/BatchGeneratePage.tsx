@@ -1,15 +1,4 @@
-type BatchMode = "queue" | "concurrent";
-
-type BatchItem = {
-  id: string;
-  prompt: string;
-  fullPrompt: string;
-  negativePrompt: string;
-  status: string;
-  path?: string;
-  error?: string;
-  previewDataUrl?: string;
-};
+import type { BatchItem, BatchMode } from "../types/app";
 
 type Props = {
   generationBusy: boolean;
@@ -79,12 +68,14 @@ export function BatchGeneratePage(props: Props) {
         </div>
       </section>
       <section className="batch-results">
-        <section className="log-panel batch-live-log">
-          <div className={props.generationBusy ? "timer-pill active" : "timer-pill"}>生成耗时: {props.elapsedSeconds}s</div>
-          <pre>{props.logs.join("\n")}</pre>
-        </section>
-        <section className="batch-result-list">
-          {props.batchItems.map((item) => (
+        <section className="batch-result-list batch-generate-results">
+          <div className="batch-result-summary">
+            <pre>{props.logs.join("\n") || "批量生成结果会显示在这里。"}</pre>
+            <div className={props.generationBusy ? "timer-pill active" : "timer-pill"}>生成耗时: {props.elapsedSeconds}s</div>
+          </div>
+          {props.batchItems.length === 0 ? (
+            <div className="batch-results-empty">生成结果会显示在这里</div>
+          ) : props.batchItems.map((item) => (
             <button key={item.id} className="batch-result-line" title={item.path ?? item.error ?? item.fullPrompt} onClick={() => props.onBatchItemApply(item)}>
               <span className="batch-result-status">{item.status}</span>
               <strong className="batch-result-prompt">{item.prompt.replace(/\s+/g, " ")}</strong>

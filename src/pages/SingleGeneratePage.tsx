@@ -1,21 +1,10 @@
-type HistoryItem = {
-  id: string;
-  createdAt: string;
-  prompt: string;
-  status: string;
-  request: unknown;
-};
+import type { PresetOption, SaveButtonState, Settings, GenerationResult } from "../types/app";
 
-type OptionItem = {
-  id: string;
-  name: string;
-  prompt: string;
-};
-
-type SaveButtonState = "idle" | "saving" | "saved" | "resave";
+type HistoryItem = GenerationResult;
+type OptionItem = PresetOption;
 
 type Props = {
-  settings: any;
+  settings: Settings;
   stylePresets: OptionItem[];
   contentTypes: OptionItem[];
   referencePreviewSrc: string;
@@ -29,7 +18,7 @@ type Props = {
   customHeight: number;
   logs: string[];
   elapsedSeconds: number;
-  onSettingsChange: (next: any) => void;
+  onSettingsChange: (next: Settings) => void;
   onApplyContentType: (value: string) => void;
   onApplyStylePreset: (value: string) => void;
   onChooseReferenceLibraryDir: () => Promise<void>;
@@ -147,16 +136,6 @@ export function SingleGeneratePage(props: Props) {
             <textarea rows={4} value={settings.negativePrompt} placeholder="不希望出现的元素、风格或缺陷..." onChange={(e) => props.onSettingsChange({ ...settings, negativePrompt: e.target.value })} />
           </div>
         </section>
-
-        <section className="history">
-          {history.slice(0, 10).map((item) => (
-            <button key={item.id} className="history-item" onClick={() => props.onApplyHistory(item)} title={item.prompt}>
-              <span>{item.createdAt}</span>
-              <strong>{item.prompt.replace(/\s+/g, " ").slice(0, 80)}</strong>
-              <em>{item.status}</em>
-            </button>
-          ))}
-        </section>
       </aside>
 
       <section className="lab-workspace">
@@ -196,6 +175,17 @@ export function SingleGeneratePage(props: Props) {
         <section className="log-panel">
           <div className={generationBusy ? "timer-pill active" : "timer-pill"}>生成耗时: {elapsedSeconds}s</div>
           <pre>{logs.join("\n")}</pre>
+        </section>
+        <section className="history-workspace">
+          {history.length === 0 ? (
+            <div className="history-empty">暂无历史记录</div>
+          ) : history.slice(0, 10).map((item) => (
+            <button key={item.id} className="history-item" onClick={() => props.onApplyHistory(item)} title={item.prompt}>
+              <span>{item.createdAt}</span>
+              <strong>{item.prompt.replace(/\s+/g, " ").slice(0, 80)}</strong>
+              <em>{item.status}</em>
+            </button>
+          ))}
         </section>
       </section>
     </main>

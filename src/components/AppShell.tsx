@@ -4,31 +4,42 @@ import { BatchConvertPage } from "../pages/BatchConvertPage";
 import { BatchGeneratePage } from "../pages/BatchGeneratePage";
 import { SettingsModal } from "../pages/SettingsModal";
 import { SingleGeneratePage } from "../pages/SingleGeneratePage";
+import type {
+  AlphaMode,
+  ApiProfile,
+  BatchItem,
+  BatchMode,
+  BlpAlphaBits,
+  BlpEncoding,
+  ConvertFilter,
+  ConvertTarget,
+  GenerationResult,
+  PngCompression,
+  PngFilter,
+  PresetOption,
+  SaveButtonState,
+  Settings,
+  TgaBits,
+  ViewMode,
+} from "../types/app";
 
-type ViewMode = "single" | "batch" | "convert";
-type BatchMode = "queue" | "concurrent";
-type ConvertTarget = "png" | "tga" | "blp";
-type TgaBits = 16 | 24 | 32;
-type BlpEncoding = "raw1" | "jpeg";
-type BlpAlphaBits = 0 | 1 | 4 | 8;
-type ConvertFilter = "nearest" | "triangle" | "catmullrom" | "gaussian" | "lanczos3";
-type AlphaMode = "passthrough" | "threshold" | "unpremultiply";
-type PngCompression = "default" | "fast" | "best";
-type PngFilter = "adaptive" | "none" | "sub" | "up" | "avg" | "paeth";
-type SaveButtonState = "idle" | "saving" | "saved" | "resave";
-
-type AppShellProps = {
+type ShellBaseProps = {
   view: ViewMode;
   setView: (view: ViewMode) => void;
-  settings: any;
-  setSettings: (settings: any) => void;
-  draftSettings: any;
-  setDraftSettings: (settings: any) => void;
+  saveNotice: string;
+  status: string;
+};
+
+type SettingsStateProps = {
+  settings: Settings;
+  setSettings: (settings: Settings) => void;
+  draftSettings: Settings;
+  setDraftSettings: (settings: Settings) => void;
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
   editingProfileId: string;
   setEditingProfileId: (id: string) => void;
-  editingProfile: any;
+  editingProfile: ApiProfile | undefined;
   apiSignupOpen: boolean;
   releaseNotesOpen: boolean;
   aboutOpen: boolean;
@@ -43,11 +54,14 @@ type AppShellProps = {
   setLocalModelName: (value: string) => void;
   setLocalModelBaseUrl: (value: string) => void;
   setLocalModelId: (value: string) => void;
-  stylePresets: any[];
-  contentTypes: any[];
+};
+
+type SingleViewProps = {
+  stylePresets: PresetOption[];
+  contentTypes: PresetOption[];
   referencePreviewSrc: string;
   maskPreviewSrc: string;
-  history: any[];
+  history: GenerationResult[];
   previewSrc: string | null;
   generationBusy: boolean;
   saveButtonState: SaveButtonState;
@@ -55,14 +69,40 @@ type AppShellProps = {
   customWidth: number;
   customHeight: number;
   generateLogs: string[];
-  convertLogs: string[];
   elapsedSeconds: number;
-  saveNotice: string;
-  status: string;
+  onSettingsChange: (settings: Settings) => void;
+  onApplyContentType: (id: string) => void;
+  onApplyStylePreset: (id: string) => void;
+  onChooseReferenceLibraryDir: () => Promise<void>;
+  onPickReferenceFromLibrary: () => Promise<void>;
+  onClearReferenceLibraryDir: () => Promise<void>;
+  onChooseReferenceImage: () => Promise<void>;
+  onChooseMaskImage: () => Promise<void>;
+  onSavePrompt: (kind: "positive" | "negative") => Promise<void>;
+  onDeletePrompt: (kind: "positive" | "negative", prompt: string) => Promise<void>;
+  onChoosePrompt: (kind: "positive" | "negative", prompt: string) => Promise<void>;
+  onApplyHistory: (item: GenerationResult) => void;
+  onGenerate: () => Promise<void>;
+  onSavePreview: () => Promise<void>;
+  onSaveSizeChange: (value: string) => void;
+  onCustomWidthChange: (value: number) => void;
+  onCustomHeightChange: (value: number) => void;
+};
+
+type BatchViewProps = {
   batchPromptText: string;
   batchMode: BatchMode;
   batchConcurrency: number;
-  batchItems: any[];
+  batchItems: BatchItem[];
+  onBatchPromptTextChange: (value: string) => void;
+  onBatchModeChange: (value: BatchMode) => void;
+  onBatchConcurrencyChange: (value: number) => void;
+  onBatchGenerate: () => Promise<void>;
+  onBatchItemApply: (item: BatchItem) => void;
+};
+
+type ConvertViewProps = {
+  convertLogs: string[];
   convertBusy: boolean;
   convertSourceDir: string;
   convertTargetDir: string;
@@ -81,28 +121,6 @@ type AppShellProps = {
   convertAlphaThreshold: number;
   convertPngCompression: PngCompression;
   convertPngFilter: PngFilter;
-  onSettingsChange: (settings: any) => void;
-  onApplyContentType: (id: string) => void;
-  onApplyStylePreset: (id: string) => void;
-  onChooseReferenceLibraryDir: () => Promise<void>;
-  onPickReferenceFromLibrary: () => Promise<void>;
-  onClearReferenceLibraryDir: () => Promise<void>;
-  onChooseReferenceImage: () => Promise<void>;
-  onChooseMaskImage: () => Promise<void>;
-  onSavePrompt: (kind: "positive" | "negative") => Promise<void>;
-  onDeletePrompt: (kind: "positive" | "negative", prompt: string) => Promise<void>;
-  onChoosePrompt: (kind: "positive" | "negative", prompt: string) => Promise<void>;
-  onApplyHistory: (item: any) => void;
-  onGenerate: () => Promise<void>;
-  onSavePreview: () => Promise<void>;
-  onSaveSizeChange: (value: string) => void;
-  onCustomWidthChange: (value: number) => void;
-  onCustomHeightChange: (value: number) => void;
-  onBatchPromptTextChange: (value: string) => void;
-  onBatchModeChange: (value: BatchMode) => void;
-  onBatchConcurrencyChange: (value: number) => void;
-  onBatchGenerate: () => Promise<void>;
-  onBatchItemApply: (item: any) => void;
   onChooseConvertSourceDir: () => Promise<void>;
   onChooseConvertTargetDir: () => Promise<void>;
   onToggleSourceFormat: (ext: string) => void;
@@ -121,8 +139,11 @@ type AppShellProps = {
   onPngCompressionChange: (value: PngCompression) => void;
   onPngFilterChange: (value: PngFilter) => void;
   onBatchConvert: () => Promise<void>;
+};
+
+type SettingsActionProps = {
   onAddProfile: () => void;
-  onUpdateEditingProfile: (patch: any) => void;
+  onUpdateEditingProfile: (patch: Partial<ApiProfile>) => void;
   onDeleteProfile: (id: string) => void;
   onChooseOutputDir: () => Promise<void>;
   onSaveAllSettings: () => Promise<void>;
@@ -130,7 +151,139 @@ type AppShellProps = {
   onConnectLocalModel: () => void;
 };
 
+type AppShellProps = ShellBaseProps &
+  SettingsStateProps &
+  SingleViewProps &
+  BatchViewProps &
+  ConvertViewProps &
+  SettingsActionProps;
+
 export function AppShell(props: AppShellProps) {
+  const singlePageProps = {
+    settings: props.settings,
+    stylePresets: props.stylePresets,
+    contentTypes: props.contentTypes,
+    referencePreviewSrc: props.referencePreviewSrc,
+    maskPreviewSrc: props.maskPreviewSrc,
+    history: props.history,
+    previewSrc: props.previewSrc,
+    generationBusy: props.generationBusy,
+    saveButtonState: props.saveButtonState,
+    saveSize: props.saveSize,
+    customWidth: props.customWidth,
+    customHeight: props.customHeight,
+    logs: props.generateLogs,
+    elapsedSeconds: props.elapsedSeconds,
+    onSettingsChange: props.onSettingsChange,
+    onApplyContentType: props.onApplyContentType,
+    onApplyStylePreset: props.onApplyStylePreset,
+    onChooseReferenceLibraryDir: props.onChooseReferenceLibraryDir,
+    onPickReferenceFromLibrary: props.onPickReferenceFromLibrary,
+    onClearReferenceLibraryDir: props.onClearReferenceLibraryDir,
+    onChooseReferenceImage: props.onChooseReferenceImage,
+    onChooseMaskImage: props.onChooseMaskImage,
+    onSavePrompt: props.onSavePrompt,
+    onDeletePrompt: props.onDeletePrompt,
+    onChoosePrompt: props.onChoosePrompt,
+    onApplyHistory: props.onApplyHistory,
+    onGenerate: props.onGenerate,
+    onSavePreview: props.onSavePreview,
+    onSaveSizeChange: props.onSaveSizeChange,
+    onCustomWidthChange: props.onCustomWidthChange,
+    onCustomHeightChange: props.onCustomHeightChange,
+  };
+
+  const batchPageProps = {
+    generationBusy: props.generationBusy,
+    elapsedSeconds: props.elapsedSeconds,
+    batchPromptText: props.batchPromptText,
+    batchMode: props.batchMode,
+    batchConcurrency: props.batchConcurrency,
+    saveSize: props.saveSize,
+    logs: props.generateLogs,
+    batchItems: props.batchItems,
+    onBatchPromptTextChange: props.onBatchPromptTextChange,
+    onBatchModeChange: props.onBatchModeChange,
+    onBatchConcurrencyChange: props.onBatchConcurrencyChange,
+    onSaveSizeChange: props.onSaveSizeChange,
+    onBatchGenerate: props.onBatchGenerate,
+    onBatchItemApply: props.onBatchItemApply,
+  };
+
+  const convertPageProps = {
+    convertBusy: props.convertBusy,
+    convertSourceDir: props.convertSourceDir,
+    convertTargetDir: props.convertTargetDir,
+    convertSourceFormats: props.convertSourceFormats,
+    convertTargetFormat: props.convertTargetFormat,
+    convertRecursive: props.convertRecursive,
+    convertKeepStructure: props.convertKeepStructure,
+    convertTgaBits: props.convertTgaBits,
+    convertTgaRle: props.convertTgaRle,
+    convertBlpEncoding: props.convertBlpEncoding,
+    convertBlpAlphaBits: props.convertBlpAlphaBits,
+    convertBlpJpegAlpha: props.convertBlpJpegAlpha,
+    convertBlpMakeMipmaps: props.convertBlpMakeMipmaps,
+    convertBlpFilter: props.convertBlpFilter,
+    convertAlphaMode: props.convertAlphaMode,
+    convertAlphaThreshold: props.convertAlphaThreshold,
+    convertPngCompression: props.convertPngCompression,
+    convertPngFilter: props.convertPngFilter,
+    logs: props.convertLogs,
+    onChooseSourceDir: props.onChooseConvertSourceDir,
+    onChooseTargetDir: props.onChooseConvertTargetDir,
+    onToggleSourceFormat: props.onToggleSourceFormat,
+    onTargetFormatChange: props.onTargetFormatChange,
+    onRecursiveChange: props.onRecursiveChange,
+    onKeepStructureChange: props.onKeepStructureChange,
+    onTgaBitsChange: props.onTgaBitsChange,
+    onTgaRleChange: props.onTgaRleChange,
+    onBlpEncodingChange: props.onBlpEncodingChange,
+    onBlpAlphaBitsChange: props.onBlpAlphaBitsChange,
+    onBlpJpegAlphaChange: props.onBlpJpegAlphaChange,
+    onBlpMakeMipmapsChange: props.onBlpMakeMipmapsChange,
+    onBlpFilterChange: props.onBlpFilterChange,
+    onAlphaModeChange: props.onAlphaModeChange,
+    onAlphaThresholdChange: props.onAlphaThresholdChange,
+    onPngCompressionChange: props.onPngCompressionChange,
+    onPngFilterChange: props.onPngFilterChange,
+    onBatchConvert: props.onBatchConvert,
+  };
+
+  const settingsModalProps = {
+    open: props.settingsOpen,
+    draftSettings: props.draftSettings,
+    editingProfileId: props.editingProfileId,
+    editingProfile: props.editingProfile,
+    localModelName: props.localModelName,
+    localModelBaseUrl: props.localModelBaseUrl,
+    localModelId: props.localModelId,
+    apiSignupOpen: props.apiSignupOpen,
+    releaseNotesOpen: props.releaseNotesOpen,
+    aboutOpen: props.aboutOpen,
+    localModelOpen: props.localModelOpen,
+    onClose: () => props.setSettingsOpen(false),
+    onSelectProfile: (id: string) => {
+      props.setEditingProfileId(id);
+      props.setDraftSettings({ ...props.draftSettings, activeApiProfileId: id });
+    },
+    onDraftSettingsChange: props.setDraftSettings,
+    onAddProfile: props.onAddProfile,
+    onUpdateEditingProfile: props.onUpdateEditingProfile,
+    onDeleteProfile: props.onDeleteProfile,
+    onChooseOutputDir: props.onChooseOutputDir,
+    onSaveAllSettings: props.onSaveAllSettings,
+    onSetApiSignupOpen: props.setApiSignupOpen,
+    onSetReleaseNotesOpen: props.setReleaseNotesOpen,
+    onSetAboutOpen: props.setAboutOpen,
+    onSetLocalModelOpen: props.setLocalModelOpen,
+    onOpenApiSignup: props.onOpenApiSignup,
+    onLocalModelNameChange: props.setLocalModelName,
+    onLocalModelBaseUrlChange: props.setLocalModelBaseUrl,
+    onLocalModelIdChange: props.setLocalModelId,
+    onConnectLocalModel: props.onConnectLocalModel,
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -144,78 +297,16 @@ export function AppShell(props: AppShellProps) {
       </header>
 
       {props.view === "single" ? (
-        <SingleGeneratePage
-          settings={props.settings} stylePresets={props.stylePresets} contentTypes={props.contentTypes}
-          referencePreviewSrc={props.referencePreviewSrc} maskPreviewSrc={props.maskPreviewSrc} history={props.history as any}
-          previewSrc={props.previewSrc} generationBusy={props.generationBusy} saveButtonState={props.saveButtonState}
-          saveSize={props.saveSize} customWidth={props.customWidth} customHeight={props.customHeight} logs={props.generateLogs} elapsedSeconds={props.elapsedSeconds}
-          onSettingsChange={props.onSettingsChange} onApplyContentType={props.onApplyContentType} onApplyStylePreset={props.onApplyStylePreset}
-          onChooseReferenceLibraryDir={props.onChooseReferenceLibraryDir}
-          onPickReferenceFromLibrary={props.onPickReferenceFromLibrary}
-          onClearReferenceLibraryDir={props.onClearReferenceLibraryDir}
-          onChooseReferenceImage={props.onChooseReferenceImage} onChooseMaskImage={props.onChooseMaskImage}
-          onSavePrompt={props.onSavePrompt} onDeletePrompt={props.onDeletePrompt} onChoosePrompt={props.onChoosePrompt}
-          onApplyHistory={props.onApplyHistory}
-          onGenerate={props.onGenerate} onSavePreview={props.onSavePreview} onSaveSizeChange={props.onSaveSizeChange}
-          onCustomWidthChange={props.onCustomWidthChange} onCustomHeightChange={props.onCustomHeightChange}
-        />
+        <SingleGeneratePage {...singlePageProps} />
       ) : props.view === "batch" ? (
-        <BatchGeneratePage
-          generationBusy={props.generationBusy} elapsedSeconds={props.elapsedSeconds}
-          batchPromptText={props.batchPromptText} batchMode={props.batchMode} batchConcurrency={props.batchConcurrency}
-          saveSize={props.saveSize} logs={props.generateLogs} batchItems={props.batchItems as any}
-          onBatchPromptTextChange={props.onBatchPromptTextChange} onBatchModeChange={props.onBatchModeChange}
-          onBatchConcurrencyChange={props.onBatchConcurrencyChange} onSaveSizeChange={props.onSaveSizeChange}
-          onBatchGenerate={props.onBatchGenerate}
-          onBatchItemApply={props.onBatchItemApply}
-        />
+        <BatchGeneratePage {...batchPageProps} />
       ) : (
-        <BatchConvertPage
-          convertBusy={props.convertBusy} convertSourceDir={props.convertSourceDir} convertTargetDir={props.convertTargetDir}
-          convertSourceFormats={props.convertSourceFormats} convertTargetFormat={props.convertTargetFormat} convertRecursive={props.convertRecursive}
-          convertKeepStructure={props.convertKeepStructure} convertTgaBits={props.convertTgaBits} convertTgaRle={props.convertTgaRle} logs={props.convertLogs}
-          convertBlpEncoding={props.convertBlpEncoding}
-          convertBlpAlphaBits={props.convertBlpAlphaBits}
-          convertBlpJpegAlpha={props.convertBlpJpegAlpha}
-          convertBlpMakeMipmaps={props.convertBlpMakeMipmaps}
-          convertBlpFilter={props.convertBlpFilter}
-          convertAlphaMode={props.convertAlphaMode}
-          convertAlphaThreshold={props.convertAlphaThreshold}
-          convertPngCompression={props.convertPngCompression}
-          convertPngFilter={props.convertPngFilter}
-          onChooseSourceDir={props.onChooseConvertSourceDir}
-          onChooseTargetDir={props.onChooseConvertTargetDir}
-          onToggleSourceFormat={props.onToggleSourceFormat} onTargetFormatChange={props.onTargetFormatChange}
-          onRecursiveChange={props.onRecursiveChange} onKeepStructureChange={props.onKeepStructureChange}
-          onTgaBitsChange={props.onTgaBitsChange} onTgaRleChange={props.onTgaRleChange}
-          onBlpEncodingChange={props.onBlpEncodingChange}
-          onBlpAlphaBitsChange={props.onBlpAlphaBitsChange}
-          onBlpJpegAlphaChange={props.onBlpJpegAlphaChange}
-          onBlpMakeMipmapsChange={props.onBlpMakeMipmapsChange}
-          onBlpFilterChange={props.onBlpFilterChange}
-          onAlphaModeChange={props.onAlphaModeChange}
-          onAlphaThresholdChange={props.onAlphaThresholdChange}
-          onPngCompressionChange={props.onPngCompressionChange}
-          onPngFilterChange={props.onPngFilterChange}
-          onBatchConvert={props.onBatchConvert}
-        />
+        <BatchConvertPage {...convertPageProps} />
       )}
 
-      <SettingsModal
-        open={props.settingsOpen} draftSettings={props.draftSettings as any} editingProfileId={props.editingProfileId}
-        editingProfile={props.editingProfile as any} localModelName={props.localModelName} localModelBaseUrl={props.localModelBaseUrl}
-        localModelId={props.localModelId} apiSignupOpen={props.apiSignupOpen} releaseNotesOpen={props.releaseNotesOpen}
-        aboutOpen={props.aboutOpen} localModelOpen={props.localModelOpen} onClose={() => props.setSettingsOpen(false)}
-        onSelectProfile={(id) => { props.setEditingProfileId(id); props.setDraftSettings({ ...props.draftSettings, activeApiProfileId: id }); }}
-        onDraftSettingsChange={props.setDraftSettings as any} onAddProfile={props.onAddProfile} onUpdateEditingProfile={props.onUpdateEditingProfile}
-        onDeleteProfile={props.onDeleteProfile} onChooseOutputDir={props.onChooseOutputDir} onSaveAllSettings={props.onSaveAllSettings}
-        onSetApiSignupOpen={props.setApiSignupOpen} onSetReleaseNotesOpen={props.setReleaseNotesOpen} onSetAboutOpen={props.setAboutOpen}
-        onSetLocalModelOpen={props.setLocalModelOpen} onOpenApiSignup={props.onOpenApiSignup}
-        onLocalModelNameChange={props.setLocalModelName} onLocalModelBaseUrlChange={props.setLocalModelBaseUrl}
-        onLocalModelIdChange={props.setLocalModelId} onConnectLocalModel={props.onConnectLocalModel}
-      />
+      <SettingsModal {...settingsModalProps} />
 
-      {props.saveNotice && <div className="save-toast" role="status"><strong>淇濆瓨鎴愬姛</strong><span>{props.saveNotice.replace(/^淇濆瓨鎴愬姛锛?/, "")}</span></div>}
+      {props.saveNotice && <div className="save-toast" role="status"><strong>保存成功</strong><span>{props.saveNotice.replace(/^保存成功：?/, "")}</span></div>}
       <footer className="status-line">{props.status}</footer>
     </div>
   );

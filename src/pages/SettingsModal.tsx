@@ -1,16 +1,4 @@
-type ApiProfile = {
-  id: string;
-  name: string;
-  apiKey: string;
-  apiBaseUrl: string;
-  model: string;
-};
-
-type Settings = {
-  apiProfiles: ApiProfile[];
-  activeApiProfileId: string;
-  outputDir: string;
-};
+import type { ApiProfile, Settings } from "../types/app";
 
 type Props = {
   open: boolean;
