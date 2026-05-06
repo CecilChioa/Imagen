@@ -934,42 +934,8 @@ label {
   font-size: 10px;
 }
 
-.batch-result-item {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 68px;
-  align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  text-align: left;
-}
-
-.batch-result-item strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.batch-result-item span,
-.batch-result-item em {
-  color: #b9bbc7;
-  font-size: 12px;
-  font-style: normal;
-}
-
-.empty-state {
-  display: grid;
-  min-height: 160px;
-  place-items: center;
-  color: #8f93a3;
-}
-
 .batch-log-panel {
   height: 150px;
-}
-
-.batch-live-log {
-  height: 100%;
-  min-height: 320px;
 }
 
 .status-footer {
@@ -1181,36 +1147,6 @@ label {
   align-self: end;
   justify-self: start;
   min-height: 40px;
-}
-
-.segmented-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.radio-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 7px 10px;
-  border: 1px solid #414150;
-  border-radius: 8px;
-  background: #1b1b23;
-  cursor: pointer;
-  user-select: none;
-}
-
-.radio-chip input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-}
-
-.radio-chip:has(input:checked) {
-  border-color: #6868ff;
-  background: #2f2f57;
 }
 
 .api-provider-list {

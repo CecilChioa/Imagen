@@ -115,10 +115,12 @@ export function SettingsModal(props: Props) {
               <button className="ghost-button" onClick={() => props.onSetReleaseNotesOpen(false)}>关闭</button>
             </div>
             <div className="about-content">
-              <strong>v1.1</strong>
-              <p>新增本地模型接口（可在设置中接入本地模型配置）。</p>
+              <strong>v1.3</strong>
+              <p>新增批量图片转换，支持 PNG/TGA/BLP 互转，可递归子目录并保持目录结构。</p>
               <strong>v1.2</strong>
               <p>保存图片默认尺寸改为原始生图尺寸，可再选择 64x64/128x128/256x256/512x512/自定义。</p>
+              <strong>v1.1</strong>
+              <p>新增本地模型接口（可在设置中接入本地模型配置）。</p>
             </div>
           </div>
         </div>
