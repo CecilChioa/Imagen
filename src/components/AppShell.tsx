@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActionIcon, Badge, Button, Group, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, Group, Tooltip } from "@mantine/core";
 import { invoke } from "@tauri-apps/api/core";
 import qqGroupIcon from "../assets/quniconhigh.png";
 import { BatchConvertPage } from "../pages/BatchConvertPage";
@@ -326,6 +326,17 @@ export function AppShell(props: AppShellProps) {
               ⚙
             </ActionIcon>
           </Tooltip>
+          <Tooltip label="加入QQ群免费获取最新版本" position="bottom" withArrow>
+            <ActionIcon
+              aria-label="加入QQ群免费获取最新版本"
+              className="qq-group-button"
+              size="lg"
+              variant="light"
+              onClick={() => invoke("open_qq_group_url")}
+            >
+              <img src={qqGroupIcon} alt="加入QQ群免费获取最新版本" />
+            </ActionIcon>
+          </Tooltip>
           <Button.Group className="view-switcher">
             <Button
               variant={props.view === "single" ? "filled" : "subtle"}
@@ -346,20 +357,6 @@ export function AppShell(props: AppShellProps) {
               批量转换
             </Button>
           </Button.Group>
-          <Badge className="status-badge" variant="light" color="gray">
-            {props.status}
-          </Badge>
-          <Tooltip label="加入QQ群免费获取最新版本" position="bottom" withArrow>
-            <ActionIcon
-              aria-label="加入QQ群免费获取最新版本"
-              className="qq-group-button"
-              size="lg"
-              variant="light"
-              onClick={() => invoke("open_qq_group_url")}
-            >
-              <img src={qqGroupIcon} alt="加入QQ群免费获取最新版本" />
-            </ActionIcon>
-          </Tooltip>
         </Group>
       </header>
 

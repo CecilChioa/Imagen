@@ -1,3 +1,4 @@
+import { Button, NumberInput, Select, Textarea } from "@mantine/core";
 import type { BatchItem, BatchMode } from "../types/app";
 
 type Props = {
@@ -18,6 +19,13 @@ type Props = {
 };
 
 export function BatchGeneratePage(props: Props) {
+  const batchPromptTotal = props.batchPromptText.split(/\r?\n/).map((text) => text.trim()).filter(Boolean).length;
+  const totalCount = props.batchItems.length || batchPromptTotal;
+  const generatedCount = props.batchItems.filter((item) => item.status === "完成").length;
+  const remainingCount = props.batchItems.length
+    ? props.batchItems.filter((item) => item.status === "等待" || item.status === "生成中").length
+    : totalCount;
+
   const filenameOf = (path?: string) => {
     if (!path) return "";
     const normalized = path.replaceAll("\\", "/");
@@ -33,44 +41,64 @@ export function BatchGeneratePage(props: Props) {
             <h2>批量生成</h2>
             <span>每行一个正向提示词，会继承当前单图设置中的正向/负向提示词。</span>
           </div>
-          <button className={props.generationBusy ? "stop-action" : "primary-action"} onClick={props.onBatchGenerate}>
+          <Button className={props.generationBusy ? "stop-action" : "primary-action"} onClick={props.onBatchGenerate}>
             {props.generationBusy ? "停止生成" : "开始生成"}
-          </button>
+          </Button>
         </div>
-        <textarea
-          className="batch-input"
+        <Textarea
+          className="batch-prompt-field"
+          classNames={{ input: "batch-input" }}
           value={props.batchPromptText}
           placeholder={"火焰风暴技能图标\n寒冰护盾技能图标\n暗影突袭技能图标"}
+          minRows={12}
           onChange={(e) => props.onBatchPromptTextChange(e.target.value)}
         />
         <div className="batch-options">
-          <label>执行模式
-            <select value={props.batchMode} onChange={(e) => props.onBatchModeChange(e.target.value as BatchMode)}>
-              <option value="queue">队列</option>
-              <option value="concurrent">并发</option>
-            </select>
-          </label>
+          <Select
+            label="执行模式"
+            value={props.batchMode}
+            data={[
+              { value: "queue", label: "队列" },
+              { value: "concurrent", label: "并发" },
+            ]}
+            onChange={(value) => value && props.onBatchModeChange(value as BatchMode)}
+            allowDeselect={false}
+          />
           {props.batchMode === "concurrent" && (
-            <label>并发数
-              <input type="number" min={1} max={20} value={props.batchConcurrency} onChange={(e) => props.onBatchConcurrencyChange(Number(e.target.value))} />
-            </label>
+            <NumberInput
+              label="并发数"
+              min={1}
+              max={20}
+              value={props.batchConcurrency}
+              allowDecimal={false}
+              onChange={(value) => props.onBatchConcurrencyChange(Number(value) || 1)}
+            />
           )}
-          <label>保存尺寸
-            <select value={props.saveSize} onChange={(e) => props.onSaveSizeChange(e.target.value)}>
-              <option value="original">原始尺寸</option>
-              <option value="64x64">64x64</option>
-              <option value="128x128">128x128</option>
-              <option value="256x256">256x256</option>
-              <option value="512x512">512x512</option>
-              <option value="custom">自定义</option>
-            </select>
-          </label>
+          <Select
+            label="保存尺寸"
+            value={props.saveSize}
+            onChange={(value) => value && props.onSaveSizeChange(value)}
+            data={[
+              { value: "original", label: "原始尺寸" },
+              { value: "64x64", label: "64x64" },
+              { value: "128x128", label: "128x128" },
+              { value: "256x256", label: "256x256" },
+              { value: "512x512", label: "512x512" },
+              { value: "custom", label: "自定义" },
+            ]}
+            allowDeselect={false}
+          />
         </div>
       </section>
       <section className="batch-results">
         <section className="batch-result-list batch-generate-results">
-          <div className="batch-result-summary">
-            <pre>{props.logs.join("\n") || "批量生成结果会显示在这里。"}</pre>
+          <div className="batch-result-status-row">
+            <strong>任务结果</strong>
+            <div className="batch-progress-counts" aria-label="批量生成进度">
+              <span>共 {totalCount} 个</span>
+              <span>已生成 {generatedCount}</span>
+              <span>剩余 {remainingCount}</span>
+            </div>
             <div className={props.generationBusy ? "timer-pill active" : "timer-pill"}>生成耗时: {props.elapsedSeconds}s</div>
           </div>
           {props.batchItems.length === 0 ? (

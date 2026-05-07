@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { contentTypes, stylePresets } from "../config/presets";
 import type { ApiProfile, BatchItem, BatchMode, GenerationResult, Settings } from "../types/app";
 
 type Params = {
@@ -33,6 +34,16 @@ type ReturnValue = {
 
 export function useGeneration(params: Params): ReturnValue {
   const generationRunIdRef = useRef(0);
+
+  const composePositivePrompt = (base: Settings, extraPrompt = "") => {
+    const contentPrompt = contentTypes.find((item) => item.id === base.contentType)?.prompt ?? "";
+    const stylePrompt = stylePresets.find((item) => item.id === base.stylePreset)?.prompt ?? "";
+
+    return [contentPrompt, stylePrompt, base.positivePrompt, extraPrompt]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join("\n");
+  };
 
   const pickReferenceFromLibrary = async (base: Settings) =>
     !base.referenceLibraryDir
@@ -72,10 +83,14 @@ export function useGeneration(params: Params): ReturnValue {
 
     try {
       const nextSettings = await pickReferenceFromLibrary(params.settings);
+      const generationSettings = {
+        ...nextSettings,
+        positivePrompt: composePositivePrompt(nextSettings),
+      };
       if (nextSettings.referenceImagePath !== params.settings.referenceImagePath) {
         params.setSettings(nextSettings);
       }
-      const result = await invoke<GenerationResult>("generate_image", { settings: nextSettings });
+      const result = await invoke<GenerationResult>("generate_image", { settings: generationSettings });
       if (generationRunIdRef.current !== runId) return;
       await saveHistoryResult(result, nextSettings);
       params.setPreviewSrc(result.outputs[0]?.dataUrl ?? null);
@@ -110,7 +125,7 @@ export function useGeneration(params: Params): ReturnValue {
     const items: BatchItem[] = prompts.map((prompt, index) => ({
       id: String(Date.now() + index),
       prompt,
-      fullPrompt: [params.settings.positivePrompt.trim(), prompt].filter(Boolean).join("\n"),
+      fullPrompt: composePositivePrompt(params.settings, prompt),
       negativePrompt: params.settings.negativePrompt.trim(),
       status: "等待",
     }));

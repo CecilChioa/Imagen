@@ -101,44 +101,50 @@ export function SettingsModal(props: Props) {
                 <div className="settings-profile-scroll">
                   <Stack gap="xs">
                     {props.draftSettings.apiProfiles.map((profile) => (
-                      <button
+                      <Button
                         key={profile.id}
-                        className={profile.id === props.editingProfileId ? "profile-item active" : "profile-item"}
+                        className={profile.id === props.editingProfileId ? "settings-profile-item active" : "settings-profile-item"}
+                        variant="subtle"
                         onClick={() => props.onSelectProfile(profile.id)}
                       >
-                        <strong>{profile.name}</strong>
-                        <small>{profile.model}</small>
-                      </button>
+                        <span className="settings-profile-name">{profile.name}</span>
+                        <span className="settings-profile-model">{profile.model}</span>
+                      </Button>
                     ))}
                   </Stack>
                 </div>
               </Stack>
             </Card>
 
-            <Card className="settings-card" withBorder>
-              <Stack gap="sm">
+            <Card className="settings-card settings-current-card" withBorder>
+              <Stack className="settings-current-form" gap="xs">
                 <Title order={3}>当前配置</Title>
                 <TextInput
+                  className="settings-current-field"
                   label="配置名称"
                   value={props.editingProfile?.name ?? ""}
                   onChange={(e) => props.onUpdateEditingProfile({ name: e.target.value })}
                 />
                 <PasswordInput
+                  className="settings-current-field"
                   label="API Key"
                   value={props.editingProfile?.apiKey ?? ""}
                   onChange={(e) => props.onUpdateEditingProfile({ apiKey: e.target.value })}
                 />
                 <TextInput
+                  className="settings-current-field"
                   label="API 地址"
                   value={props.editingProfile?.apiBaseUrl ?? ""}
                   onChange={(e) => props.onUpdateEditingProfile({ apiBaseUrl: e.target.value })}
                 />
                 <TextInput
+                  className="settings-current-field settings-current-model-field"
                   label="模型名称"
                   value={props.editingProfile?.model ?? ""}
                   onChange={(e) => props.onUpdateEditingProfile({ model: e.target.value })}
                 />
                 <Button
+                  className="settings-delete-api-button"
                   color="red"
                   variant="light"
                   disabled={props.draftSettings.apiProfiles.length <= 1 || !props.editingProfile}
@@ -157,18 +163,18 @@ export function SettingsModal(props: Props) {
                 value={props.draftSettings.outputDir}
                 onChange={(e) => props.onDraftSettingsChange({ ...props.draftSettings, outputDir: e.target.value })}
               />
-              <Button variant="light" onClick={props.onChooseOutputDir}>选择文件夹</Button>
+              <Button className="settings-output-picker" variant="light" onClick={props.onChooseOutputDir}>选择文件夹</Button>
             </Group>
           </Card>
 
-          <Group justify="space-between" align="center">
-            <Group gap="xs">
+          <Group className="settings-footer" justify="space-between" align="center">
+            <Group className="settings-footer-actions" gap="xs">
               <Button variant="subtle" onClick={() => props.onSetApiSignupOpen(true)}>获取 API</Button>
               <Button variant="subtle" onClick={() => props.onSetReleaseNotesOpen(true)}>更新提示</Button>
               <Button variant="subtle" onClick={() => props.onSetAboutOpen(true)}>关于软件</Button>
               <Button variant="subtle" onClick={() => props.onSetLocalModelOpen(true)}>接入本地模型</Button>
             </Group>
-            <Button onClick={props.onSaveAllSettings}>保存设置</Button>
+            <Button className="settings-save-button" onClick={props.onSaveAllSettings}>保存设置</Button>
           </Group>
         </Stack>
       </Modal>

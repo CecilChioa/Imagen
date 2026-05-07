@@ -1,3 +1,4 @@
+import { Button, Checkbox, Select, TextInput } from "@mantine/core";
 import type {
   AlphaMode,
   BlpAlphaBits,
@@ -62,55 +63,54 @@ function LabelHelp({ text }: { text: string }) {
 
 export function BatchConvertPage(props: Props) {
   return (
-    <main className="batch-layout">
-      <section className="batch-panel">
-        <div className="batch-header">
+    <main className="batch-layout batch-convert-layout">
+      <section className="batch-panel batch-convert-panel">
+        <div className="batch-header batch-convert-header">
           <div>
             <h2>批量转换</h2>
             <span>支持 PNG/TGA/BLP 互转，可递归子目录并保持目录结构。</span>
           </div>
-          <button
-            className={props.convertBusy ? "stop-action" : "primary-action"}
+          <Button
+            className={props.convertBusy ? "stop-action batch-convert-action" : "primary-action batch-convert-action"}
             disabled={props.convertBusy}
             onClick={props.onBatchConvert}
           >
             {props.convertBusy ? "转换中..." : "开始转换"}
-          </button>
+          </Button>
         </div>
 
-        <div className="batch-options">
+        <div className="batch-options batch-convert-options">
           <label className="batch-path-row">
             源文件夹
-            <div className="path-picker">
-              <input value={props.convertSourceDir} readOnly placeholder="请选择源文件夹" />
-              <button type="button" className="ghost-button" onClick={props.onChooseSourceDir}>
+            <div className="path-picker path-picker-mantine">
+              <TextInput value={props.convertSourceDir} readOnly placeholder="请选择源文件夹" />
+              <Button type="button" className="ghost-button" onClick={props.onChooseSourceDir}>
                 选择文件夹
-              </button>
+              </Button>
             </div>
           </label>
 
           <label className="batch-path-row">
             目标文件夹
-            <div className="path-picker">
-              <input value={props.convertTargetDir} readOnly placeholder="请选择目标文件夹" />
-              <button type="button" className="ghost-button" onClick={props.onChooseTargetDir}>
+            <div className="path-picker path-picker-mantine">
+              <TextInput value={props.convertTargetDir} readOnly placeholder="请选择目标文件夹" />
+              <Button type="button" className="ghost-button" onClick={props.onChooseTargetDir}>
                 选择文件夹
-              </button>
+              </Button>
             </div>
           </label>
 
           <div className="field-group">
             <span className="field-label">源格式</span>
-            <div className="format-checks">
+            <div className="format-checks format-checks-mantine">
               {sourceFormats.map((ext) => (
-                <label key={ext} className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={props.convertSourceFormats.includes(ext)}
-                    onChange={() => props.onToggleSourceFormat(ext)}
-                  />
-                  <span>{ext.toUpperCase()}</span>
-                </label>
+                <Checkbox
+                  key={ext}
+                  className="format-check-item"
+                  label={ext.toUpperCase()}
+                  checked={props.convertSourceFormats.includes(ext)}
+                  onChange={() => props.onToggleSourceFormat(ext)}
+                />
               ))}
             </div>
           </div>
@@ -120,14 +120,16 @@ export function BatchConvertPage(props: Props) {
               目标格式
               <LabelHelp text="BLP：War3 纹理格式；PNG：通用无损；TGA：兼容传统美术流程。" />
             </span>
-            <select
+            <Select
               value={props.convertTargetFormat}
-              onChange={(e) => props.onTargetFormatChange(e.target.value as ConvertTarget)}
-            >
-              <option value="blp">BLP</option>
-              <option value="png">PNG</option>
-              <option value="tga">TGA</option>
-            </select>
+              data={[
+                { value: "blp", label: "BLP" },
+                { value: "png", label: "PNG" },
+                { value: "tga", label: "TGA" },
+              ]}
+              onChange={(value) => value && props.onTargetFormatChange(value as ConvertTarget)}
+              allowDeselect={false}
+            />
           </label>
 
           {props.convertTargetFormat === "tga" && (
@@ -135,22 +137,22 @@ export function BatchConvertPage(props: Props) {
               <span className="field-label compact-options-title">TGA 选项</span>
               <label>
                 <span className="label-title">颜色位深</span>
-                <select
+                <Select
                   value={String(props.convertTgaBits)}
-                  onChange={(e) => props.onTgaBitsChange(Number(e.target.value) as TgaBits)}
-                >
-                  <option value="24">24 位 RGB</option>
-                  <option value="32">32 位 RGBA</option>
-                </select>
-              </label>
-              <label className="checkbox-row compact-inline-check">
-                <input
-                  type="checkbox"
-                  checked={props.convertTgaRle}
-                  onChange={(e) => props.onTgaRleChange(e.target.checked)}
+                  data={[
+                    { value: "24", label: "24 位 RGB" },
+                    { value: "32", label: "32 位 RGBA" },
+                  ]}
+                  onChange={(value) => value && props.onTgaBitsChange(Number(value) as TgaBits)}
+                  allowDeselect={false}
                 />
-                <span>RLE 压缩</span>
               </label>
+              <Checkbox
+                className="compact-inline-check"
+                label="RLE 压缩"
+                checked={props.convertTgaRle}
+                onChange={(e) => props.onTgaRleChange(e.currentTarget.checked)}
+              />
             </div>
           )}
 
@@ -162,13 +164,15 @@ export function BatchConvertPage(props: Props) {
                   编码
                   <LabelHelp text="RAW1：调色板编码，体积小、兼容传统贴图；JPEG：有损压缩，适合照片类内容。" />
                 </span>
-                <select
+                <Select
                   value={props.convertBlpEncoding}
-                  onChange={(e) => props.onBlpEncodingChange(e.target.value as BlpEncoding)}
-                >
-                  <option value="raw1">RAW1 (调色板)</option>
-                  <option value="jpeg">JPEG</option>
-                </select>
+                  data={[
+                    { value: "raw1", label: "RAW1 (调色板)" },
+                    { value: "jpeg", label: "JPEG" },
+                  ]}
+                  onChange={(value) => value && props.onBlpEncodingChange(value as BlpEncoding)}
+                  allowDeselect={false}
+                />
               </label>
 
               <label className="blp-filter-field">
@@ -176,16 +180,18 @@ export function BatchConvertPage(props: Props) {
                   缩放滤镜
                   <LabelHelp text="Nearest：最快；Triangle：平滑基础；CatmullRom：清晰均衡；Gaussian：更柔和；Lanczos3：细节最好但最慢。" />
                 </span>
-                <select
+                <Select
                   value={props.convertBlpFilter}
-                  onChange={(e) => props.onBlpFilterChange(e.target.value as ConvertFilter)}
-                >
-                  <option value="nearest">Nearest</option>
-                  <option value="triangle">Triangle</option>
-                  <option value="catmullrom">CatmullRom</option>
-                  <option value="gaussian">Gaussian</option>
-                  <option value="lanczos3">Lanczos3</option>
-                </select>
+                  data={[
+                    { value: "nearest", label: "Nearest" },
+                    { value: "triangle", label: "Triangle" },
+                    { value: "catmullrom", label: "CatmullRom" },
+                    { value: "gaussian", label: "Gaussian" },
+                    { value: "lanczos3", label: "Lanczos3" },
+                  ]}
+                  onChange={(value) => value && props.onBlpFilterChange(value as ConvertFilter)}
+                  allowDeselect={false}
+                />
               </label>
 
               {props.convertBlpEncoding === "raw1" ? (
@@ -194,25 +200,25 @@ export function BatchConvertPage(props: Props) {
                     Alpha 位数
                     <LabelHelp text="0：不保留透明；1/4：低精度透明；8：完整 8bit 透明，质量最好但体积更大。" />
                   </span>
-                  <select
+                  <Select
                     value={String(props.convertBlpAlphaBits)}
-                    onChange={(e) => props.onBlpAlphaBitsChange(Number(e.target.value) as BlpAlphaBits)}
-                  >
-                    <option value="0">0</option>
-                    <option value="1">1</option>
-                    <option value="4">4</option>
-                    <option value="8">8</option>
-                  </select>
+                    data={[
+                      { value: "0", label: "0" },
+                      { value: "1", label: "1" },
+                      { value: "4", label: "4" },
+                      { value: "8", label: "8" },
+                    ]}
+                    onChange={(value) => value && props.onBlpAlphaBitsChange(Number(value) as BlpAlphaBits)}
+                    allowDeselect={false}
+                  />
                 </label>
               ) : (
-                <label className="checkbox-row blp-inline-check blp-alpha-bits-field">
-                  <input
-                    type="checkbox"
-                    checked={props.convertBlpJpegAlpha}
-                    onChange={(e) => props.onBlpJpegAlphaChange(e.target.checked)}
-                  />
-                  <span>JPEG 模式保留 Alpha</span>
-                </label>
+                <Checkbox
+                  className="blp-inline-check blp-alpha-bits-field"
+                  label="JPEG 模式保留 Alpha"
+                  checked={props.convertBlpJpegAlpha}
+                  onChange={(e) => props.onBlpJpegAlphaChange(e.currentTarget.checked)}
+                />
               )}
 
               <label className="blp-alpha-mode-field">
@@ -221,36 +227,36 @@ export function BatchConvertPage(props: Props) {
                   <LabelHelp text="直通：保留原始 Alpha；阈值：按阈值二值化透明；反预乘：把预乘 Alpha 还原为直通颜色。" />
                 </span>
                 <div className="alpha-mode-control">
-                  <select
+                  <Select
                     value={props.convertAlphaMode}
-                    onChange={(e) => props.onAlphaModeChange(e.target.value as AlphaMode)}
-                  >
-                    <option value="passthrough">直通</option>
-                    <option value="threshold">阈值</option>
-                    <option value="unpremultiply">反预乘</option>
-                  </select>
+                    data={[
+                      { value: "passthrough", label: "直通" },
+                      { value: "threshold", label: "阈值" },
+                      { value: "unpremultiply", label: "反预乘" },
+                    ]}
+                    onChange={(value) => value && props.onAlphaModeChange(value as AlphaMode)}
+                    allowDeselect={false}
+                  />
                   {props.convertAlphaMode === "threshold" && (
-                    <input
+                    <TextInput
                       className="threshold-input"
                       type="number"
                       min={0}
                       max={255}
-                      value={props.convertAlphaThreshold}
-                      onChange={(e) => props.onAlphaThresholdChange(Math.max(0, Math.min(255, Number(e.target.value) || 0)))}
+                      value={String(props.convertAlphaThreshold)}
+                      onChange={(e) => props.onAlphaThresholdChange(Math.max(0, Math.min(255, Number(e.currentTarget.value) || 0)))}
                       aria-label="Alpha 阈值"
                     />
                   )}
                 </div>
               </label>
 
-              <label className="checkbox-row blp-inline-check blp-mipmap-field">
-                <input
-                  type="checkbox"
-                  checked={props.convertBlpMakeMipmaps}
-                  onChange={(e) => props.onBlpMakeMipmapsChange(e.target.checked)}
-                />
-                <span>生成 Mipmap</span>
-              </label>
+              <Checkbox
+                className="blp-inline-check blp-mipmap-field"
+                label="生成 Mipmap"
+                checked={props.convertBlpMakeMipmaps}
+                onChange={(e) => props.onBlpMakeMipmapsChange(e.currentTarget.checked)}
+              />
             </div>
           )}
 
@@ -262,31 +268,35 @@ export function BatchConvertPage(props: Props) {
                   压缩级别
                   <LabelHelp text="默认：平衡速度与体积；快速：编码更快、体积稍大；最佳：体积最小、耗时更长。" />
                 </span>
-                <select
+                <Select
                   value={props.convertPngCompression}
-                  onChange={(e) => props.onPngCompressionChange(e.target.value as PngCompression)}
-                >
-                  <option value="default">默认</option>
-                  <option value="fast">快速</option>
-                  <option value="best">最佳</option>
-                </select>
+                  data={[
+                    { value: "default", label: "默认" },
+                    { value: "fast", label: "快速" },
+                    { value: "best", label: "最佳" },
+                  ]}
+                  onChange={(value) => value && props.onPngCompressionChange(value as PngCompression)}
+                  allowDeselect={false}
+                />
               </label>
               <label>
                 <span className="label-title">
                   滤波器
                   <LabelHelp text="Adaptive：自动选择；None：不滤波；Sub/Up/Avg/Paeth：不同扫描线预测策略，影响压缩体积与速度。" />
                 </span>
-                <select
+                <Select
                   value={props.convertPngFilter}
-                  onChange={(e) => props.onPngFilterChange(e.target.value as PngFilter)}
-                >
-                  <option value="adaptive">Adaptive</option>
-                  <option value="none">None</option>
-                  <option value="sub">Sub</option>
-                  <option value="up">Up</option>
-                  <option value="avg">Avg</option>
-                  <option value="paeth">Paeth</option>
-                </select>
+                  data={[
+                    { value: "adaptive", label: "Adaptive" },
+                    { value: "none", label: "None" },
+                    { value: "sub", label: "Sub" },
+                    { value: "up", label: "Up" },
+                    { value: "avg", label: "Avg" },
+                    { value: "paeth", label: "Paeth" },
+                  ]}
+                  onChange={(value) => value && props.onPngFilterChange(value as PngFilter)}
+                  allowDeselect={false}
+                />
               </label>
             </div>
           )}
@@ -299,22 +309,24 @@ export function BatchConvertPage(props: Props) {
                   <LabelHelp text="直通：保留原始 Alpha；阈值：按阈值二值化透明；反预乘：把预乘 Alpha 还原为直通颜色。" />
                 </span>
                 <div className="alpha-mode-control">
-                  <select
+                  <Select
                     value={props.convertAlphaMode}
-                    onChange={(e) => props.onAlphaModeChange(e.target.value as AlphaMode)}
-                  >
-                    <option value="passthrough">直通</option>
-                    <option value="threshold">阈值</option>
-                    <option value="unpremultiply">反预乘</option>
-                  </select>
+                    data={[
+                      { value: "passthrough", label: "直通" },
+                      { value: "threshold", label: "阈值" },
+                      { value: "unpremultiply", label: "反预乘" },
+                    ]}
+                    onChange={(value) => value && props.onAlphaModeChange(value as AlphaMode)}
+                    allowDeselect={false}
+                  />
                   {props.convertAlphaMode === "threshold" && (
-                    <input
+                    <TextInput
                       className="threshold-input"
                       type="number"
                       min={0}
                       max={255}
-                      value={props.convertAlphaThreshold}
-                      onChange={(e) => props.onAlphaThresholdChange(Math.max(0, Math.min(255, Number(e.target.value) || 0)))}
+                      value={String(props.convertAlphaThreshold)}
+                      onChange={(e) => props.onAlphaThresholdChange(Math.max(0, Math.min(255, Number(e.currentTarget.value) || 0)))}
                       aria-label="Alpha 阈值"
                     />
                   )}
@@ -323,23 +335,19 @@ export function BatchConvertPage(props: Props) {
             </div>
           )}
 
-          <label className="checkbox-row convert-flag-row">
-            <input
-              type="checkbox"
-              checked={props.convertRecursive}
-              onChange={(e) => props.onRecursiveChange(e.target.checked)}
-            />
-            <span>解析子文件夹</span>
-          </label>
+          <Checkbox
+            className="convert-flag-row"
+            label="解析子文件夹"
+            checked={props.convertRecursive}
+            onChange={(e) => props.onRecursiveChange(e.currentTarget.checked)}
+          />
 
-          <label className="checkbox-row convert-flag-row">
-            <input
-              type="checkbox"
-              checked={props.convertKeepStructure}
-              onChange={(e) => props.onKeepStructureChange(e.target.checked)}
-            />
-            <span>保持文件夹结构</span>
-          </label>
+          <Checkbox
+            className="convert-flag-row"
+            label="保持文件夹结构"
+            checked={props.convertKeepStructure}
+            onChange={(e) => props.onKeepStructureChange(e.currentTarget.checked)}
+          />
         </div>
       </section>
 

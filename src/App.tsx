@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -95,22 +95,20 @@ const createApiProfile = (): ApiProfile => ({
 
 const formatLog = (value: unknown) => JSON.stringify(value, null, 2);
 
-const replaceFragment = (
-  source: string,
-  fragments: string[],
-  next: string,
-) => {
-  const cleaned = [source, ...fragments]
-    .reduce((acc, fragment) => (fragment ? acc.split(fragment).join("") : acc), source)
+const stripPresetPrompts = (source: string) => {
+  const presetPrompts = [...contentTypes, ...stylePresets]
+    .map((item) => item.prompt.trim())
+    .filter(Boolean);
+
+  return presetPrompts
+    .reduce((current, prompt) => current.split(prompt).join(""), source)
+    .split(/\r?\n/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n")
     .replace(/\s*,\s*,+/g, ", ")
     .replace(/^\s*,\s*|\s*,\s*$/g, "")
     .trim();
-
-  if (!next) {
-    return cleaned;
-  }
-
-  return `${cleaned}${cleaned ? ", " : ""}${next}`;
 };
 
 export default function App() {
@@ -375,30 +373,16 @@ export default function App() {
   };
 
   const applyStylePreset = (id: string) => {
-    const preset = stylePresets.find((item) => item.id === id) ?? stylePresets[0];
-
     setSettings({
       ...settings,
       stylePreset: id,
-      positivePrompt: replaceFragment(
-        settings.positivePrompt,
-        stylePresets.map((item) => item.prompt),
-        preset.prompt,
-      ),
     });
   };
 
   const applyContentType = (id: string) => {
-    const type = contentTypes.find((item) => item.id === id) ?? contentTypes[0];
-
     setSettings({
-      ...settings,
+    ...settings,
       contentType: id,
-      positivePrompt: replaceFragment(
-        settings.positivePrompt,
-        contentTypes.map((item) => item.prompt),
-        type.prompt,
-      ),
     });
   };
 
@@ -487,8 +471,8 @@ export default function App() {
       ...current,
       positivePrompt:
         typeof request.positive_prompt === "string"
-          ? request.positive_prompt
-          : item.prompt,
+          ? stripPresetPrompts(request.positive_prompt)
+          : stripPresetPrompts(item.prompt),
       negativePrompt:
         typeof request.negative_prompt === "string"
           ? request.negative_prompt
@@ -500,7 +484,7 @@ export default function App() {
     setView("single");
     setSettings((current) => ({
       ...current,
-      positivePrompt: item.fullPrompt,
+      positivePrompt: item.prompt,
       negativePrompt: item.negativePrompt,
     }));
   };
