@@ -91,6 +91,7 @@ const resources = {
       batch: {
         title: "批量生成",
         subtitle: "每行一个正向提示词，会继承当前单图设置中的正向/负向提示词。",
+        placeholder: "每行输入一个正向提示词，例如：\n可爱猫咪\n赛博朋克城市夜景\n古风山水画",
         stop: "停止生成",
         start: "开始生成",
         executionMode: "执行模式",
@@ -131,6 +132,37 @@ const resources = {
         keepStructure: "保持文件夹结构",
         logs: "任务日志",
         empty: "合成日志会显示在这里"
+      },
+      preset: {
+        content: {
+          icon: "图标",
+          poster: "宣传图",
+          ui: "UI",
+          character: "角色立绘",
+          scene: "场景概念",
+          product: "产品渲染",
+          cover: "封面主视觉",
+          banner: "横幅海报",
+          social: "社媒配图",
+          texture: "材质贴图",
+          background: "背景壁纸"
+        },
+        style: {
+          none: "默认风格",
+          dark: "暗黑奇幻",
+          pixel: "像素艺术",
+          xianxia: "国风仙侠",
+          ink: "中式水墨",
+          anime: "次元幻想",
+          scifi: "科幻未来",
+          mecha: "机甲工业",
+          magic: "魔法史诗",
+          national: "国潮插画",
+          watercolor: "清新水彩",
+          oilpaint: "厚涂手绘",
+          minimal: "极简扁平",
+          realism: "写实电影"
+        }
       },
       convert: {
         title: "批量转换",

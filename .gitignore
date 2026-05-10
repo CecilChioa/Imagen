@@ -42,3 +42,4 @@ _convert_logs/
 # --- Build/Release artifacts ---
 release/
 debug/
+dist-release/

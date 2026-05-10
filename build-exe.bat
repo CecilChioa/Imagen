@@ -25,7 +25,7 @@ if not exist "node_modules" (
   if errorlevel 1 goto failed
 )
 
-call npm run build:matrix
+call npm run build:matrix -- --target=windows-x64
 if errorlevel 1 goto failed
 
 echo.
