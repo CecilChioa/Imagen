@@ -42,6 +42,7 @@ const stripPresetPrompts = (source: string) => {
     .trim();
 };
 
+//app
 export default function App() {
   const { t } = useTranslation();
   // UI 状态
