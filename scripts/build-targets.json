@@ -1,14 +1,26 @@
 {
   "targets": [
     {
-      "name": "windows-x64",
+      "name": "windows-amd64",
       "triple": "x86_64-pc-windows-msvc",
       "executableName": "imagen.exe",
       "enabled": true
     },
     {
-      "name": "linux-x64",
+      "name": "windows-arm64",
+      "triple": "aarch64-pc-windows-msvc",
+      "executableName": "imagen.exe",
+      "enabled": true
+    },
+    {
+      "name": "linux-amd64",
       "triple": "x86_64-unknown-linux-gnu",
+      "executableName": "imagen",
+      "enabled": true
+    },
+    {
+      "name": "macos-amd64",
+      "triple": "x86_64-apple-darwin",
       "executableName": "imagen",
       "enabled": true
     },
