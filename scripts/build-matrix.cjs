@@ -16,7 +16,7 @@ const requestedTargets = cliArgs.flatMap((arg) => {
     .map((item) => item.trim())
     .filter(Boolean);
 });
-const defaultTargets = process.platform === "win32" ? ["windows-x64"] : [];
+const defaultTargets = process.platform === "win32" ? ["windows-amd64"] : [];
 const effectiveRequestedTargets = requestedTargets.length ? requestedTargets : defaultTargets;
 const enabledTargets = configuredTargets.filter((target) => target.enabled !== false);
 const targets = effectiveRequestedTargets.length

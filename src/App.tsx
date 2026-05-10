@@ -481,7 +481,7 @@ export default function App() {
     customHeight,
     logs: generateLogs,
     elapsedSeconds,
-    onSettingsChange: setSettings,
+    onSettingsChange: persistSettingsDebounced,
     onApplyContentType: applyContentType,
     onApplyStylePreset: applyStylePreset,
     onChooseReferenceLibraryDir,

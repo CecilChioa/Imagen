@@ -3,12 +3,15 @@
 setlocal
 cd /d "%~dp0"
 
-echo Building Imagen release artifacts...
+set LOCAL_TARGET=windows-amd64
+
+echo Building Imagen local Windows artifacts...
+echo Target: %LOCAL_TARGET%
 echo.
 
 for /f "usebackq delims=" %%v in (`powershell -NoProfile -Command "(Get-Content -Raw package.json | ConvertFrom-Json).version"`) do set CURRENT_VERSION=%%v
 echo Current version: %CURRENT_VERSION%
-set /p APP_VERSION=Enter version for this build ^(press Enter to keep current^): 
+set /p APP_VERSION=Enter version for this local build ^(press Enter to keep current^): 
 if not "%APP_VERSION%"=="" (
   node "scripts\update-version.cjs" "%APP_VERSION%"
   if errorlevel 1 goto failed
@@ -25,12 +28,12 @@ if not exist "node_modules" (
   if errorlevel 1 goto failed
 )
 
-call npm run build:matrix -- --target=windows-x64
+call npm run build:matrix -- --target=%LOCAL_TARGET%
 if errorlevel 1 goto failed
 
 echo.
-echo Release files are under:
-echo   dist-release\%BUILD_VERSION%\
+echo Local Windows release files are under:
+echo   dist-release\%BUILD_VERSION%\%LOCAL_TARGET%\
 echo.
 echo Cleaning Rust build cache...
 cargo clean --manifest-path src-tauri\Cargo.toml
@@ -43,6 +46,6 @@ exit /b 0
 
 :failed
 echo.
-echo Build failed. Check the error output above.
+echo Local Windows build failed. Check the error output above.
 pause
 exit /b 1
