@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import type { Dispatch, SetStateAction } from "react";
+import { commandErrorMessage, invokeCommand } from "../lib/tauri";
 import type { GenerationResult, Settings } from "../types/app";
 
 type Params = {
@@ -44,7 +44,7 @@ export function useSettingsPersistenceEffects(params: Params): ReturnValue {
   } = params;
 
   useEffect(() => {
-    invoke<Settings>("load_settings")
+    invokeCommand<Settings>("load_settings")
       .then((value) => {
         const next = normalizeSettings(value);
         setSettings(next);
@@ -61,7 +61,7 @@ export function useSettingsPersistenceEffects(params: Params): ReturnValue {
       setReferencePreviewSrc("");
       return;
     }
-    invoke<string>("read_image_data_url", { path: settings.referenceImagePath })
+    invokeCommand<string>("read_image_data_url", { path: settings.referenceImagePath })
       .then(setReferencePreviewSrc)
       .catch(() => setReferencePreviewSrc(""));
   }, [settings.referenceImagePath]);
@@ -71,7 +71,7 @@ export function useSettingsPersistenceEffects(params: Params): ReturnValue {
       setMaskPreviewSrc("");
       return;
     }
-    invoke<string>("read_image_data_url", { path: settings.maskImagePath })
+    invokeCommand<string>("read_image_data_url", { path: settings.maskImagePath })
       .then(setMaskPreviewSrc)
       .catch(() => setMaskPreviewSrc(""));
   }, [settings.maskImagePath]);
@@ -91,7 +91,7 @@ export function useSettingsPersistenceEffects(params: Params): ReturnValue {
   const persistSettings = async (next: Settings) => {
     setSettings(next);
     setDraftSettings(next);
-    await invoke("save_settings", { settings: next });
+    await invokeCommand("save_settings", { settings: next });
   };
 
   const persistTimerRef = useRef<number | null>(null);
@@ -102,8 +102,11 @@ export function useSettingsPersistenceEffects(params: Params): ReturnValue {
       window.clearTimeout(persistTimerRef.current);
     }
     persistTimerRef.current = window.setTimeout(() => {
-      invoke("save_settings", { settings: next });
-      persistTimerRef.current = null;
+      invokeCommand("save_settings", { settings: next })
+        .catch((error) => setStatus(commandErrorMessage(error)))
+        .finally(() => {
+          persistTimerRef.current = null;
+        });
     }, delay);
   };
 

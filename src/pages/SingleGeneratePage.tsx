@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button, Modal, NumberInput, Select, TextInput, Textarea } from "@mantine/core";
+import { HISTORY_LIMIT } from "../config/generation";
 import type { PresetOption, SaveButtonState, Settings, GenerationResult } from "../types/app";
 
 type HistoryItem = GenerationResult;
@@ -40,6 +42,7 @@ type Props = {
 };
 
 export function SingleGeneratePage(props: Props) {
+  const { t } = useTranslation();
   const {
     settings,
     stylePresets,
@@ -67,13 +70,16 @@ export function SingleGeneratePage(props: Props) {
     panX: number;
     panY: number;
   } | null>(null);
+
   const changePreviewZoom = (delta: number) => {
     setPreviewZoomScale((current) => Math.min(4, Math.max(0.25, Math.round((current + delta) * 100) / 100)));
   };
+
   const resetPreviewZoom = () => {
     setPreviewZoomScale(1);
     setPreviewPan({ x: 0, y: 0 });
   };
+
   const fitPreviewZoom = () => {
     if (!previewImageSize.width || !previewImageSize.height) {
       setPreviewZoomScale(1);
@@ -95,192 +101,193 @@ export function SingleGeneratePage(props: Props) {
 
   const zoomedPreviewWidth = previewImageSize.width > 0 ? Math.round(previewImageSize.width * previewZoomScale) : 0;
   const zoomedPreviewHeight = previewImageSize.height > 0 ? Math.round(previewImageSize.height * previewZoomScale) : 0;
+  const logsText = useMemo(() => logs.join("\n"), [logs]);
 
   return (
     <>
       <main className="lab-layout">
         <aside className="lab-panel">
-        <section className="panel-section">
-          <div className="style-library-card">
-            <div className="style-type-grid">
-              <Select
-                label="生成方向"
-                value={settings.contentType}
-                data={contentTypes.map((type) => ({ value: type.id, label: type.name }))}
-                onChange={(value) => value && props.onApplyContentType(value)}
-              />
-              <Select
-                label="风格预设"
-                value={settings.stylePreset}
-                data={stylePresets.map((preset) => ({ value: preset.id, label: preset.name }))}
-                onChange={(value) => value && props.onApplyStylePreset(value)}
-              />
-            </div>
-            <div className="path-picker path-picker-mantine">
-              <TextInput
-                label="参考图库"
-                value={settings.referenceLibraryDir || "未选择参考图库文件夹"}
-                readOnly
-              />
-              <Button type="button" className="ghost-button" onClick={props.onChooseReferenceLibraryDir}>选择文件夹</Button>
-            </div>
-            <div className="style-library-actions">
-              <Button type="button" className="ghost-button" disabled={!settings.referenceLibraryDir} onClick={props.onPickReferenceFromLibrary}>
-                随机参考图
-              </Button>
-              <Button type="button" className="ghost-button" disabled={!settings.referenceLibraryDir} onClick={props.onClearReferenceLibraryDir}>
-                清除图库
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel-section">
-          <h2>图生图（可选）</h2>
-          <div className="image-picker-grid">
-            <button className={settings.referenceImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.referenceImagePath ? props.onSettingsChange({ ...settings, referenceImagePath: "" }) : props.onChooseReferenceImage())}>
-              {referencePreviewSrc ? <img src={referencePreviewSrc} alt="参考图预览" /> : null}
-              <span>参考图</span>
-              <small>{settings.referenceImagePath ? "已选择，点击清除" : "点击选择"}</small>
-            </button>
-            <button className={settings.maskImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.maskImagePath ? props.onSettingsChange({ ...settings, maskImagePath: "" }) : props.onChooseMaskImage())}>
-              {maskPreviewSrc ? <img src={maskPreviewSrc} alt="蒙版预览" /> : null}
-              <span>蒙版</span>
-              <small>{settings.maskImagePath ? "已选择，点击清除" : "点击选择"}</small>
-            </button>
-          </div>
-        </section>
-
-        <section className="panel-section prompt-section">
-          <div className="prompt-field">
-            <div className="prompt-toolbar">
-              <span>正向提示词</span>
-              <div className="prompt-library-actions">
+          <section className="panel-section">
+            <div className="style-library-card">
+              <div className="style-type-grid">
                 <Select
-                  value={settings.positivePromptLibrary.includes(settings.positivePrompt) ? settings.positivePrompt : null}
-                  data={[
-                    { value: "", label: "选择历史提示词" },
-                    ...settings.positivePromptLibrary.map((prompt: string) => ({ value: prompt, label: prompt.slice(0, 48) })),
-                  ]}
-                  onChange={(value) => props.onChoosePrompt("positive", value ?? "")}
-                  placeholder="选择历史提示词"
+                  label={t("single.contentType")}
+                  value={settings.contentType}
+                  data={contentTypes.map((type) => ({ value: type.id, label: type.labelKey ? t(type.labelKey) : type.name }))}
+                  onChange={(value) => value && props.onApplyContentType(value)}
                 />
-                <Button type="button" className="mini-button" onClick={() => props.onSavePrompt("positive")}>保存</Button>
-                <Button type="button" className="mini-button danger-mini" disabled={!settings.positivePromptLibrary.includes(settings.positivePrompt)} onClick={() => props.onDeletePrompt("positive", settings.positivePrompt)}>删除</Button>
+                <Select
+                  label={t("single.stylePreset")}
+                  value={settings.stylePreset}
+                  data={stylePresets.map((preset) => ({ value: preset.id, label: preset.labelKey ? t(preset.labelKey) : preset.name }))}
+                  onChange={(value) => value && props.onApplyStylePreset(value)}
+                />
+              </div>
+              <div className="path-picker path-picker-mantine">
+                <TextInput
+                  label={t("single.referenceLibrary")}
+                  value={settings.referenceLibraryDir || t("single.noReferenceLibrary")}
+                  readOnly
+                />
+                <Button type="button" className="ghost-button" onClick={props.onChooseReferenceLibraryDir}>{t("settings.chooseFolder")}</Button>
+              </div>
+              <div className="style-library-actions">
+                <Button type="button" className="ghost-button" disabled={!settings.referenceLibraryDir} onClick={props.onPickReferenceFromLibrary}>
+                  {t("single.randomReference")}
+                </Button>
+                <Button type="button" className="ghost-button" disabled={!settings.referenceLibraryDir} onClick={props.onClearReferenceLibraryDir}>
+                  {t("single.clearLibrary")}
+                </Button>
               </div>
             </div>
-            <Textarea
-              minRows={7}
-              value={settings.positivePrompt}
-              placeholder="正向提示词的描述"
-              onChange={(e) => props.onSettingsChange({ ...settings, positivePrompt: e.target.value })}
-            />
+          </section>
+
+          <section className="panel-section">
+            <h2>{t("single.imageToImage")}</h2>
+            <div className="image-picker-grid">
+              <button className={settings.referenceImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.referenceImagePath ? props.onSettingsChange({ ...settings, referenceImagePath: "" }) : props.onChooseReferenceImage())}>
+                {referencePreviewSrc ? <img src={referencePreviewSrc} alt={t("single.referenceImageAlt")} /> : null}
+                <span>{t("single.referenceImage")}</span>
+                <small>{settings.referenceImagePath ? t("single.selectedClickClear") : t("single.clickToChoose")}</small>
+              </button>
+              <button className={settings.maskImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.maskImagePath ? props.onSettingsChange({ ...settings, maskImagePath: "" }) : props.onChooseMaskImage())}>
+                {maskPreviewSrc ? <img src={maskPreviewSrc} alt={t("single.maskImageAlt")} /> : null}
+                <span>{t("single.maskImage")}</span>
+                <small>{settings.maskImagePath ? t("single.selectedClickClear") : t("single.clickToChoose")}</small>
+              </button>
+            </div>
+          </section>
+
+          <section className="panel-section prompt-section">
+            <div className="prompt-field">
+              <div className="prompt-toolbar">
+                <span>{t("single.positivePrompt")}</span>
+                <div className="prompt-library-actions">
+                  <Select
+                    value={settings.positivePromptLibrary.includes(settings.positivePrompt) ? settings.positivePrompt : null}
+                    data={[
+                      { value: "", label: t("single.chooseHistoryPrompt") },
+                      ...settings.positivePromptLibrary.map((prompt: string) => ({ value: prompt, label: prompt.slice(0, 48) })),
+                    ]}
+                    onChange={(value) => props.onChoosePrompt("positive", value ?? "")}
+                    placeholder={t("single.chooseHistoryPrompt")}
+                  />
+                  <Button type="button" className="mini-button" onClick={() => props.onSavePrompt("positive")}>{t("single.savePrompt")}</Button>
+                  <Button type="button" className="mini-button danger-mini" disabled={!settings.positivePromptLibrary.includes(settings.positivePrompt)} onClick={() => props.onDeletePrompt("positive", settings.positivePrompt)}>{t("single.deletePrompt")}</Button>
+                </div>
+              </div>
+              <Textarea
+                minRows={7}
+                value={settings.positivePrompt}
+                placeholder={t("single.positivePlaceholder")}
+                onChange={(e) => props.onSettingsChange({ ...settings, positivePrompt: e.target.value })}
+              />
+            </div>
+            <div className="prompt-field">
+              <div className="prompt-toolbar">
+                <span>{t("single.negativePrompt")}</span>
+                <div className="prompt-library-actions">
+                  <Select
+                    value={settings.negativePromptLibrary.includes(settings.negativePrompt) ? settings.negativePrompt : null}
+                    data={[
+                      { value: "", label: t("single.chooseHistoryPrompt") },
+                      ...settings.negativePromptLibrary.map((prompt: string) => ({ value: prompt, label: prompt.slice(0, 48) })),
+                    ]}
+                    onChange={(value) => props.onChoosePrompt("negative", value ?? "")}
+                    placeholder={t("single.chooseHistoryPrompt")}
+                  />
+                  <Button type="button" className="mini-button" onClick={() => props.onSavePrompt("negative")}>{t("single.savePrompt")}</Button>
+                  <Button type="button" className="mini-button danger-mini" disabled={!settings.negativePromptLibrary.includes(settings.negativePrompt)} onClick={() => props.onDeletePrompt("negative", settings.negativePrompt)}>{t("single.deletePrompt")}</Button>
+                </div>
+              </div>
+              <Textarea
+                minRows={4}
+                value={settings.negativePrompt}
+                placeholder={t("single.negativePlaceholder")}
+                onChange={(e) => props.onSettingsChange({ ...settings, negativePrompt: e.target.value })}
+              />
+            </div>
+          </section>
+        </aside>
+
+        <section className="lab-workspace">
+          <button
+            className={previewSrc ? "preview-stage has-image" : "preview-stage"}
+            disabled={!previewSrc}
+            onClick={() => {
+              if (!previewSrc) return;
+              resetPreviewZoom();
+              setPreviewZoomOpen(true);
+            }}
+            title={previewSrc ? t("single.previewTitle") : undefined}
+          >
+            {previewSrc ? (
+              <span className="preview-stage-frame">
+                <img src={previewSrc} alt={t("single.previewAlt")} />
+              </span>
+            ) : <span>{t("single.previewPlaceholder")}</span>}
+          </button>
+          <div className="operation-row">
+            <div className="bottom-actions">
+              <Button className={generationBusy ? "stop-action" : "primary-action"} onClick={props.onGenerate}>
+                {generationBusy ? t("single.stopGenerate") : previewSrc ? t("single.regenerate") : t("single.generate")}
+              </Button>
+              <Button className={saveButtonState === "saved" ? "save-action saved" : "save-action"} disabled={!previewSrc || saveButtonState === "saving"} onClick={props.onSavePreview}>
+                {saveButtonState === "saving" ? t("single.saving") : saveButtonState === "saved" ? t("single.saveSuccess") : saveButtonState === "resave" ? t("single.saveAgain") : t("single.saveImage")}
+              </Button>
+            </div>
+            <div className="save-size-control">
+              <Select
+                value={saveSize}
+                onChange={(value) => value && props.onSaveSizeChange(value)}
+                data={[
+                  { value: "original", label: t("single.originalSize") },
+                  { value: "64x64", label: "64x64" },
+                  { value: "128x128", label: "128x128" },
+                  { value: "256x256", label: "256x256" },
+                  { value: "512x512", label: "512x512" },
+                  { value: "custom", label: t("single.custom") },
+                ]}
+                allowDeselect={false}
+              />
+            </div>
           </div>
-          <div className="prompt-field">
-            <div className="prompt-toolbar">
-              <span>负向提示词</span>
-              <div className="prompt-library-actions">
-                <Select
-                  value={settings.negativePromptLibrary.includes(settings.negativePrompt) ? settings.negativePrompt : null}
-                  data={[
-                    { value: "", label: "选择历史提示词" },
-                    ...settings.negativePromptLibrary.map((prompt: string) => ({ value: prompt, label: prompt.slice(0, 48) })),
-                  ]}
-                  onChange={(value) => props.onChoosePrompt("negative", value ?? "")}
-                  placeholder="选择历史提示词"
+          {saveSize === "custom" && (
+            <div className="custom-size-row">
+              <span>{t("single.saveSize")}</span>
+              <div className="custom-size">
+                <NumberInput
+                  min={1}
+                  value={customWidth}
+                  onChange={(value) => props.onCustomWidthChange(Number(value) || 1)}
+                  allowDecimal={false}
                 />
-                <Button type="button" className="mini-button" onClick={() => props.onSavePrompt("negative")}>保存</Button>
-                <Button type="button" className="mini-button danger-mini" disabled={!settings.negativePromptLibrary.includes(settings.negativePrompt)} onClick={() => props.onDeletePrompt("negative", settings.negativePrompt)}>删除</Button>
+                <span>x</span>
+                <NumberInput
+                  min={1}
+                  value={customHeight}
+                  onChange={(value) => props.onCustomHeightChange(Number(value) || 1)}
+                  allowDecimal={false}
+                />
               </div>
             </div>
-            <Textarea
-              minRows={4}
-              value={settings.negativePrompt}
-              placeholder="不希望出现的元素、风格或缺陷..."
-              onChange={(e) => props.onSettingsChange({ ...settings, negativePrompt: e.target.value })}
-            />
-          </div>
+          )}
+          <section className="log-panel">
+            <div className={generationBusy ? "timer-pill active" : "timer-pill"}>{t("batch.elapsed", { seconds: elapsedSeconds })}</div>
+            <pre>{logsText}</pre>
+          </section>
+          <section className="history-workspace">
+            {history.length === 0 ? (
+              <div className="history-empty">-</div>
+            ) : history.slice(0, HISTORY_LIMIT).map((item) => (
+              <button key={item.id} className="history-item" onClick={() => props.onApplyHistory(item)} title={item.prompt}>
+                <span>{item.createdAt}</span>
+                <strong>{item.prompt.replace(/\s+/g, " ").slice(0, 80)}</strong>
+                <em>{item.status}</em>
+              </button>
+            ))}
+          </section>
         </section>
-      </aside>
-
-      <section className="lab-workspace">
-        <button
-          className={previewSrc ? "preview-stage has-image" : "preview-stage"}
-          disabled={!previewSrc}
-          onClick={() => {
-            if (!previewSrc) return;
-            resetPreviewZoom();
-            setPreviewZoomOpen(true);
-          }}
-          title={previewSrc ? "点击查看原图" : undefined}
-        >
-          {previewSrc ? (
-            <span className="preview-stage-frame">
-              <img src={previewSrc} alt="生成结果预览" />
-            </span>
-          ) : <span>等待生成结果...</span>}
-        </button>
-        <div className="operation-row">
-          <div className="bottom-actions">
-            <Button className={generationBusy ? "stop-action" : "primary-action"} onClick={props.onGenerate}>
-              {generationBusy ? "停止生成" : previewSrc ? "重新生成" : "生成图片"}
-            </Button>
-            <Button className={saveButtonState === "saved" ? "save-action saved" : "save-action"} disabled={!previewSrc || saveButtonState === "saving"} onClick={props.onSavePreview}>
-              {saveButtonState === "saving" ? "保存中..." : saveButtonState === "saved" ? "保存成功" : saveButtonState === "resave" ? "再次保存" : "保存图片"}
-            </Button>
-          </div>
-          <div className="save-size-control">
-            <Select
-              value={saveSize}
-              onChange={(value) => value && props.onSaveSizeChange(value)}
-              data={[
-                { value: "original", label: "原始尺寸" },
-                { value: "64x64", label: "64x64" },
-                { value: "128x128", label: "128x128" },
-                { value: "256x256", label: "256x256" },
-                { value: "512x512", label: "512x512" },
-                { value: "custom", label: "自定义" },
-              ]}
-              allowDeselect={false}
-            />
-          </div>
-        </div>
-        {saveSize === "custom" && (
-          <div className="custom-size-row">
-            <span>保存尺寸</span>
-            <div className="custom-size">
-              <NumberInput
-                min={1}
-                value={customWidth}
-                onChange={(value) => props.onCustomWidthChange(Number(value) || 1)}
-                allowDecimal={false}
-              />
-              <span>x</span>
-              <NumberInput
-                min={1}
-                value={customHeight}
-                onChange={(value) => props.onCustomHeightChange(Number(value) || 1)}
-                allowDecimal={false}
-              />
-            </div>
-          </div>
-        )}
-        <section className="log-panel">
-          <div className={generationBusy ? "timer-pill active" : "timer-pill"}>生成耗时: {elapsedSeconds}s</div>
-          <pre>{logs.join("\n")}</pre>
-        </section>
-        <section className="history-workspace">
-          {history.length === 0 ? (
-            <div className="history-empty">暂无历史记录</div>
-          ) : history.slice(0, 10).map((item) => (
-            <button key={item.id} className="history-item" onClick={() => props.onApplyHistory(item)} title={item.prompt}>
-              <span>{item.createdAt}</span>
-              <strong>{item.prompt.replace(/\s+/g, " ").slice(0, 80)}</strong>
-              <em>{item.status}</em>
-            </button>
-          ))}
-        </section>
-      </section>
       </main>
       <Modal
         opened={previewZoomOpen}
@@ -290,19 +297,19 @@ export function SingleGeneratePage(props: Props) {
         }}
         title={(
           <div className="preview-zoom-title">
-            <span>原图预览</span>
+            <span>{t("single.previewTitle")}</span>
             <div className="preview-zoom-controls">
-              <Button type="button" className="mini-button" onClick={() => changePreviewZoom(-0.25)}>缩小</Button>
+              <Button type="button" className="mini-button" onClick={() => changePreviewZoom(-0.25)}>{t("single.zoomOut")}</Button>
               <span className="preview-zoom-percent">{Math.round(previewZoomScale * 100)}%</span>
-              <Button type="button" className="mini-button" onClick={() => changePreviewZoom(0.25)}>放大</Button>
+              <Button type="button" className="mini-button" onClick={() => changePreviewZoom(0.25)}>{t("single.zoomIn")}</Button>
               <Button type="button" className="mini-button" onClick={resetPreviewZoom}>100%</Button>
-              <Button type="button" className="mini-button" onClick={fitPreviewZoom}>适配窗口</Button>
+              <Button type="button" className="mini-button" onClick={fitPreviewZoom}>{t("single.fitWindow")}</Button>
               <Button
                 type="button"
                 className="mini-button"
                 onClick={() => setPreviewZoomFullscreen((current) => !current)}
               >
-                {previewZoomFullscreen ? "还原窗口" : "窗口全屏"}
+                {previewZoomFullscreen ? t("single.restoreWindow") : t("single.fullscreenWindow")}
               </Button>
             </div>
           </div>
@@ -355,7 +362,7 @@ export function SingleGeneratePage(props: Props) {
             >
               <img
                 src={previewSrc}
-                alt="生成结果原图"
+                alt={t("single.previewAlt")}
                 className="preview-zoom-image"
                 draggable={false}
                 onLoad={(event) => {
@@ -372,4 +379,3 @@ export function SingleGeneratePage(props: Props) {
     </>
   );
 }
-

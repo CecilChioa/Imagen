@@ -4,6 +4,8 @@ import type {
   AlphaMode,
   BlpAlphaBits,
   BlpEncoding,
+  BlpJpegQuality,
+  BlpMipmapCount,
   ConvertFilter,
   ConvertTarget,
   PngCompression,
@@ -33,10 +35,10 @@ type UseConvertSettingsReturn = {
   setConvertBlpEncoding: (value: BlpEncoding) => void;
   convertBlpAlphaBits: BlpAlphaBits;
   setConvertBlpAlphaBits: (value: BlpAlphaBits) => void;
-  convertBlpJpegAlpha: boolean;
-  setConvertBlpJpegAlpha: (value: boolean) => void;
-  convertBlpMakeMipmaps: boolean;
-  setConvertBlpMakeMipmaps: (value: boolean) => void;
+  convertBlpJpegQuality: BlpJpegQuality;
+  setConvertBlpJpegQuality: (value: BlpJpegQuality) => void;
+  convertBlpMipmapCount: BlpMipmapCount;
+  setConvertBlpMipmapCount: (value: BlpMipmapCount) => void;
   convertBlpFilter: ConvertFilter;
   setConvertBlpFilter: (value: ConvertFilter) => void;
   convertAlphaMode: AlphaMode;
@@ -63,8 +65,8 @@ export function useConvertSettings(defaultSettings: Settings): UseConvertSetting
   const [convertTgaRle, setConvertTgaRle] = useState(defaultSettings.convertTgaRle);
   const [convertBlpEncoding, setConvertBlpEncoding] = useState<BlpEncoding>(defaultSettings.convertBlpEncoding);
   const [convertBlpAlphaBits, setConvertBlpAlphaBits] = useState<BlpAlphaBits>(defaultSettings.convertBlpAlphaBits);
-  const [convertBlpJpegAlpha, setConvertBlpJpegAlpha] = useState(defaultSettings.convertBlpJpegAlpha);
-  const [convertBlpMakeMipmaps, setConvertBlpMakeMipmaps] = useState(defaultSettings.convertBlpMakeMipmaps);
+  const [convertBlpJpegQuality, setConvertBlpJpegQuality] = useState(defaultSettings.convertBlpJpegQuality);
+  const [convertBlpMipmapCount, setConvertBlpMipmapCount] = useState(defaultSettings.convertBlpMipmapCount);
   const [convertBlpFilter, setConvertBlpFilter] = useState<ConvertFilter>(defaultSettings.convertBlpFilter);
   const [convertAlphaMode, setConvertAlphaMode] = useState<AlphaMode>(defaultSettings.convertAlphaMode);
   const [convertAlphaThreshold, setConvertAlphaThreshold] = useState(defaultSettings.convertAlphaThreshold);
@@ -82,8 +84,8 @@ export function useConvertSettings(defaultSettings: Settings): UseConvertSetting
     setConvertTgaRle(next.convertTgaRle);
     setConvertBlpEncoding(next.convertBlpEncoding);
     setConvertBlpAlphaBits(next.convertBlpAlphaBits);
-    setConvertBlpJpegAlpha(next.convertBlpJpegAlpha);
-    setConvertBlpMakeMipmaps(next.convertBlpMakeMipmaps);
+    setConvertBlpJpegQuality(next.convertBlpJpegQuality);
+    setConvertBlpMipmapCount(next.convertBlpMipmapCount);
     setConvertBlpFilter(next.convertBlpFilter);
     setConvertAlphaMode(next.convertAlphaMode);
     setConvertAlphaThreshold(next.convertAlphaThreshold);
@@ -103,8 +105,8 @@ export function useConvertSettings(defaultSettings: Settings): UseConvertSetting
     convertTgaRle,
     convertBlpEncoding,
     convertBlpAlphaBits,
-    convertBlpJpegAlpha,
-    convertBlpMakeMipmaps,
+    convertBlpJpegQuality,
+    convertBlpMipmapCount,
     convertBlpFilter,
     convertAlphaMode,
     convertAlphaThreshold,
@@ -139,10 +141,10 @@ export function useConvertSettings(defaultSettings: Settings): UseConvertSetting
     setConvertBlpEncoding,
     convertBlpAlphaBits,
     setConvertBlpAlphaBits,
-    convertBlpJpegAlpha,
-    setConvertBlpJpegAlpha,
-    convertBlpMakeMipmaps,
-    setConvertBlpMakeMipmaps,
+    convertBlpJpegQuality,
+    setConvertBlpJpegQuality,
+    convertBlpMipmapCount,
+    setConvertBlpMipmapCount,
     convertBlpFilter,
     setConvertBlpFilter,
     convertAlphaMode,

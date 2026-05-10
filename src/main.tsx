@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { MantineProvider, createTheme } from "@mantine/core";
 import App from "./App";
+import "./i18n";
 import "@mantine/core/styles.css";
 import "./styles.css";
 
@@ -24,21 +25,9 @@ const theme = createTheme({
     ],
   },
   components: {
-    Button: {
-      defaultProps: {
-        size: "sm",
-      },
-    },
-    TextInput: {
-      defaultProps: {
-        size: "sm",
-      },
-    },
-    Select: {
-      defaultProps: {
-        size: "sm",
-      },
-    },
+    Button: { defaultProps: { size: "sm" } },
+    TextInput: { defaultProps: { size: "sm" } },
+    Select: { defaultProps: { size: "sm" } },
   },
 });
 
@@ -49,4 +38,3 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </MantineProvider>
   </React.StrictMode>,
 );
-

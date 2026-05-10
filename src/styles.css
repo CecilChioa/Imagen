@@ -78,8 +78,41 @@ select {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #6765ff;
-  box-shadow: 0 0 0 1px #6765ff;
+  border-color: #62646b;
+  box-shadow: none;
+  outline: none;
+}
+
+.mantine-Input-wrapper,
+.mantine-Input-input,
+.mantine-Select-input {
+  --input-bd: #62646b;
+  --input-bd-focus: #62646b;
+  --input-outline: none;
+  outline: none;
+  box-shadow: none;
+}
+
+.mantine-Input-input,
+.mantine-Select-input {
+  border: 1px solid #62646b;
+  background-clip: border-box;
+}
+
+.mantine-Input-wrapper:focus,
+.mantine-Input-wrapper:focus-within,
+.mantine-Input-input:focus,
+.mantine-Input-input:focus-within,
+.mantine-Input-input[data-expanded="true"],
+.mantine-Select-input:focus,
+.mantine-Select-input:focus-within,
+.mantine-Select-input[data-expanded="true"] {
+  --input-bd: #62646b;
+  --input-bd-focus: #62646b;
+  --input-outline: none;
+  border-color: #62646b;
+  box-shadow: none;
+  outline: none;
 }
 
 textarea {
@@ -1060,8 +1093,19 @@ label {
 }
 
 .batch-options .alpha-options,
-.batch-options .convert-flag-row {
+.batch-options .convert-flag-inline-row {
   grid-column: 1 / -1;
+}
+
+.convert-flag-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+}
+
+.batch-options .convert-flag-row {
+  min-width: 0;
 }
 
 .batch-options .alpha-options {
@@ -1803,7 +1847,7 @@ label {
 }
 
 .settings-api-grid {
-  --settings-api-card-height: 450px;
+  --settings-api-card-height: 415px;
   align-items: stretch;
 }
 
@@ -1872,11 +1916,11 @@ label {
   margin-top: -8px;
 }
 
-.settings-output-row {
-  align-items: end;
+.settings-output-card .mantine-Stack-root {
+  gap: 10px !important;
 }
 
-.settings-output-row .mantine-InputWrapper-label {
+.settings-output-card .mantine-InputWrapper-label {
   position: relative;
   top: -3px;
   margin-bottom: 7px;
@@ -1885,12 +1929,23 @@ label {
   font-weight: 900;
 }
 
+.settings-output-card .mantine-Input-input,
+.settings-output-card .mantine-Select-input {
+  height: 40px;
+  min-height: 40px;
+}
+
+.settings-output-row {
+  align-items: end;
+}
+
 .settings-modal-content {
   border: 1px solid rgba(116, 122, 158, 0.28);
   background: linear-gradient(180deg, rgba(28, 32, 43, 0.98), rgba(15, 18, 26, 0.98));
 }
 
 .settings-modal-body {
+  overflow: hidden;
   padding-top: 8px;
 }
 

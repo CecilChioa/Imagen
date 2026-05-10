@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActionIcon, Button, Group, Tooltip } from "@mantine/core";
-import { invoke } from "@tauri-apps/api/core";
 import qqGroupIcon from "../assets/quniconhigh.png";
+import { invokeCommand } from "../lib/tauri";
+import { BatchComposePage } from "../pages/BatchComposePage";
 import { BatchConvertPage } from "../pages/BatchConvertPage";
 import { BatchGeneratePage } from "../pages/BatchGeneratePage";
 import { SettingsModal } from "../pages/SettingsModal";
@@ -13,6 +15,7 @@ import type {
   BatchMode,
   BlpAlphaBits,
   BlpEncoding,
+  BlpMipmapCount,
   ConvertFilter,
   ConvertTarget,
   GenerationResult,
@@ -106,6 +109,14 @@ type BatchViewProps = {
 type ConvertViewProps = {
   convertLogs: string[];
   convertBusy: boolean;
+  composeLogs: string[];
+  composeBusy: boolean;
+  composeBaseDir: string;
+  composeLowerOverlayPath: string;
+  composeUpperOverlayPath: string;
+  composeTargetDir: string;
+  composeRecursive: boolean;
+  composeKeepStructure: boolean;
   convertSourceDir: string;
   convertTargetDir: string;
   convertSourceFormats: string[];
@@ -116,8 +127,8 @@ type ConvertViewProps = {
   convertTgaRle: boolean;
   convertBlpEncoding: BlpEncoding;
   convertBlpAlphaBits: BlpAlphaBits;
-  convertBlpJpegAlpha: boolean;
-  convertBlpMakeMipmaps: boolean;
+  convertBlpJpegQuality: number;
+  convertBlpMipmapCount: BlpMipmapCount;
   convertBlpFilter: ConvertFilter;
   convertAlphaMode: AlphaMode;
   convertAlphaThreshold: number;
@@ -125,6 +136,12 @@ type ConvertViewProps = {
   convertPngFilter: PngFilter;
   onChooseConvertSourceDir: () => Promise<void>;
   onChooseConvertTargetDir: () => Promise<void>;
+  onChooseComposeBaseDir: () => Promise<void>;
+  onChooseComposeLowerOverlay: () => Promise<void>;
+  onChooseComposeUpperOverlay: () => Promise<void>;
+  onClearComposeLowerOverlay: () => void;
+  onClearComposeUpperOverlay: () => void;
+  onChooseComposeTargetDir: () => Promise<void>;
   onToggleSourceFormat: (ext: string) => void;
   onTargetFormatChange: (value: ConvertTarget) => void;
   onRecursiveChange: (value: boolean) => void;
@@ -133,14 +150,17 @@ type ConvertViewProps = {
   onTgaRleChange: (value: boolean) => void;
   onBlpEncodingChange: (value: BlpEncoding) => void;
   onBlpAlphaBitsChange: (value: BlpAlphaBits) => void;
-  onBlpJpegAlphaChange: (value: boolean) => void;
-  onBlpMakeMipmapsChange: (value: boolean) => void;
+  onBlpJpegQualityChange: (value: number) => void;
+  onBlpMipmapCountChange: (value: BlpMipmapCount) => void;
   onBlpFilterChange: (value: ConvertFilter) => void;
   onAlphaModeChange: (value: AlphaMode) => void;
   onAlphaThresholdChange: (value: number) => void;
   onPngCompressionChange: (value: PngCompression) => void;
   onPngFilterChange: (value: PngFilter) => void;
+  onComposeRecursiveChange: (value: boolean) => void;
+  onComposeKeepStructureChange: (value: boolean) => void;
   onBatchConvert: () => Promise<void>;
+  onBatchCompose: () => Promise<void>;
 };
 
 type SettingsActionProps = {
@@ -161,6 +181,15 @@ type AppShellProps = ShellBaseProps &
   SettingsActionProps;
 
 export function AppShell(props: AppShellProps) {
+  const { t } = useTranslation();
+  const translateStatus = (value: string) => (value.startsWith("status.") ? t(value) : value);
+  const batchStatusLabel = (statusCode?: BatchItem["statusCode"], fallback = "") => {
+    if (statusCode === "pending") return t("batch.pending");
+    if (statusCode === "running") return t("batch.running");
+    if (statusCode === "done") return t("batch.done");
+    if (statusCode === "failed") return t("batch.failed");
+    return fallback;
+  };
   const singlePageProps = {
     settings: props.settings,
     stylePresets: props.stylePresets,
@@ -203,7 +232,7 @@ export function AppShell(props: AppShellProps) {
     batchConcurrency: props.batchConcurrency,
     saveSize: props.saveSize,
     logs: props.generateLogs,
-    batchItems: props.batchItems,
+    batchItems: props.batchItems.map((item) => ({ ...item, status: batchStatusLabel(item.statusCode, item.status) })),
     onBatchPromptTextChange: props.onBatchPromptTextChange,
     onBatchModeChange: props.onBatchModeChange,
     onBatchConcurrencyChange: props.onBatchConcurrencyChange,
@@ -224,8 +253,8 @@ export function AppShell(props: AppShellProps) {
     convertTgaRle: props.convertTgaRle,
     convertBlpEncoding: props.convertBlpEncoding,
     convertBlpAlphaBits: props.convertBlpAlphaBits,
-    convertBlpJpegAlpha: props.convertBlpJpegAlpha,
-    convertBlpMakeMipmaps: props.convertBlpMakeMipmaps,
+    convertBlpJpegQuality: props.convertBlpJpegQuality,
+    convertBlpMipmapCount: props.convertBlpMipmapCount,
     convertBlpFilter: props.convertBlpFilter,
     convertAlphaMode: props.convertAlphaMode,
     convertAlphaThreshold: props.convertAlphaThreshold,
@@ -242,14 +271,34 @@ export function AppShell(props: AppShellProps) {
     onTgaRleChange: props.onTgaRleChange,
     onBlpEncodingChange: props.onBlpEncodingChange,
     onBlpAlphaBitsChange: props.onBlpAlphaBitsChange,
-    onBlpJpegAlphaChange: props.onBlpJpegAlphaChange,
-    onBlpMakeMipmapsChange: props.onBlpMakeMipmapsChange,
+    onBlpJpegQualityChange: props.onBlpJpegQualityChange,
+    onBlpMipmapCountChange: props.onBlpMipmapCountChange,
     onBlpFilterChange: props.onBlpFilterChange,
     onAlphaModeChange: props.onAlphaModeChange,
     onAlphaThresholdChange: props.onAlphaThresholdChange,
     onPngCompressionChange: props.onPngCompressionChange,
     onPngFilterChange: props.onPngFilterChange,
     onBatchConvert: props.onBatchConvert,
+  };
+
+  const composePageProps = {
+    composeBusy: props.composeBusy,
+    composeBaseDir: props.composeBaseDir,
+    composeLowerOverlayPath: props.composeLowerOverlayPath,
+    composeUpperOverlayPath: props.composeUpperOverlayPath,
+    composeTargetDir: props.composeTargetDir,
+    composeRecursive: props.composeRecursive,
+    composeKeepStructure: props.composeKeepStructure,
+    composeLogs: props.composeLogs,
+    onChooseBaseDir: props.onChooseComposeBaseDir,
+    onChooseLowerOverlay: props.onChooseComposeLowerOverlay,
+    onChooseUpperOverlay: props.onChooseComposeUpperOverlay,
+    onClearLowerOverlay: props.onClearComposeLowerOverlay,
+    onClearUpperOverlay: props.onClearComposeUpperOverlay,
+    onChooseTargetDir: props.onChooseComposeTargetDir,
+    onComposeRecursiveChange: props.onComposeRecursiveChange,
+    onComposeKeepStructureChange: props.onComposeKeepStructureChange,
+    onBatchCompose: props.onBatchCompose,
   };
 
   const settingsModalProps = {
@@ -287,16 +336,22 @@ export function AppShell(props: AppShellProps) {
   };
 
   const statusTone = useMemo(() => {
-    if (/失败|错误|中止|停止/.test(props.status)) return "warning";
-    if (/成功|完成|已保存/.test(props.status)) return "success";
-    if (/生成中|转换中|处理中|保存中/.test(props.status)) return "loading";
+    if (!props.status) return "info";
+    if (props.status.startsWith("status.")) {
+      if (["status.generationStopped", "status.batchGenerationStopped"].includes(props.status)) return "warning";
+      if (["status.generationCompleted", "status.batchGenerationCompleted", "status.composeCompleted", "status.saveCompleted", "status.settingsSaved", "status.localModelConnected", "status.referencePicked"].includes(props.status)) return "success";
+      return "info";
+    }
+    if (/failed|error|stop/i.test(props.status)) return "warning";
+    if (/saved|completed|success/i.test(props.status)) return "success";
+    if (/loading|saving|running|processing/i.test(props.status)) return "loading";
     return "info";
   }, [props.status]);
 
-  const [statusToastVisible, setStatusToastVisible] = useState(Boolean(props.status && props.status !== "就绪"));
+  const [statusToastVisible, setStatusToastVisible] = useState(Boolean(props.status));
 
   useEffect(() => {
-    if (!props.status || props.status === "就绪") {
+    if (!props.status) {
       setStatusToastVisible(false);
       return undefined;
     }
@@ -315,9 +370,9 @@ export function AppShell(props: AppShellProps) {
     <div className="app-shell">
       <header className="topbar">
         <Group className="topbar-actions" gap="xs" wrap="nowrap">
-          <Tooltip label="打开设置" position="bottom" withArrow>
+          <Tooltip label={t("topbar.openSettings")} position="bottom" withArrow>
             <ActionIcon
-              aria-label="设置"
+              aria-label={t("topbar.openSettings")}
               className="settings-action"
               size="lg"
               variant="light"
@@ -326,15 +381,17 @@ export function AppShell(props: AppShellProps) {
               ⚙
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="加入QQ群免费获取最新版本" position="bottom" withArrow>
+          <Tooltip label={t("topbar.qqGroup")} position="bottom" withArrow>
             <ActionIcon
-              aria-label="加入QQ群免费获取最新版本"
+              aria-label={t("topbar.qqGroup")}
               className="qq-group-button"
               size="lg"
               variant="light"
-              onClick={() => invoke("open_qq_group_url")}
+              onClick={() => {
+                invokeCommand("open_qq_group_url").catch((error) => console.error(error));
+              }}
             >
-              <img src={qqGroupIcon} alt="加入QQ群免费获取最新版本" />
+              <img src={qqGroupIcon} alt={t("topbar.qqGroup")} />
             </ActionIcon>
           </Tooltip>
           <Button.Group className="view-switcher">
@@ -342,19 +399,25 @@ export function AppShell(props: AppShellProps) {
               variant={props.view === "single" ? "filled" : "subtle"}
               onClick={() => props.setView("single")}
             >
-              单图生成
+              {t("topbar.single")}
             </Button>
             <Button
               variant={props.view === "batch" ? "filled" : "subtle"}
               onClick={() => props.setView("batch")}
             >
-              批量生成
+              {t("topbar.batch")}
             </Button>
             <Button
               variant={props.view === "convert" ? "filled" : "subtle"}
               onClick={() => props.setView("convert")}
             >
-              批量转换
+              {t("topbar.convert")}
+            </Button>
+            <Button
+              variant={props.view === "compose" ? "filled" : "subtle"}
+              onClick={() => props.setView("compose")}
+            >
+              {t("topbar.compose")}
             </Button>
           </Button.Group>
         </Group>
@@ -364,17 +427,19 @@ export function AppShell(props: AppShellProps) {
         <SingleGeneratePage {...singlePageProps} />
       ) : props.view === "batch" ? (
         <BatchGeneratePage {...batchPageProps} />
-      ) : (
+      ) : props.view === "convert" ? (
         <BatchConvertPage {...convertPageProps} />
+      ) : (
+        <BatchComposePage {...composePageProps} />
       )}
 
       <SettingsModal {...settingsModalProps} />
 
-      {props.saveNotice && <div className="save-toast" role="status"><strong>保存成功</strong><span>{props.saveNotice.replace(/^保存成功：?/, "")}</span></div>}
+      {props.saveNotice && <div className="save-toast" role="status"><strong>{t("saveToast.title")}</strong><span>{props.saveNotice}</span></div>}
       {statusToastVisible && (
         <div className={`status-toast ${statusTone}`} role="status" aria-live="polite">
           <span className="status-toast-dot" />
-          <span className="status-toast-text">{props.status}</span>
+          <span className="status-toast-text">{translateStatus(props.status)}</span>
         </div>
       )}
     </div>

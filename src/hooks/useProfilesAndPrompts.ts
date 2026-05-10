@@ -1,6 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import type { Dispatch, SetStateAction } from "react";
+import i18n from "../i18n";
+import { chooseDirectory } from "../lib/filePickers";
+import { invokeCommand } from "../lib/tauri";
 import type { ApiProfile, Settings } from "../types/app";
 
 type Params = {
@@ -37,12 +38,12 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
   const savePromptToLibrary = async (kind: "positive" | "negative") => {
     const prompt = (kind === "positive" ? params.settings.positivePrompt : params.settings.negativePrompt).trim();
     if (!prompt) {
-      params.setStatus(`${kind === "positive" ? "正向" : "负向"}提示词为空`);
+      params.setStatus(`status.${kind === "positive" ? "promptEmptyPositive" : "promptEmptyNegative"}`);
       return;
     }
     const key = kind === "positive" ? "positivePromptLibrary" : "negativePromptLibrary";
     if (params.settings[key].includes(prompt)) {
-      params.setStatus("提示词已在库中");
+      params.setStatus("status.promptAlreadyExists");
       return;
     }
     await params.persistSettings({ ...params.settings, [key]: [prompt, ...params.settings[key]] });
@@ -93,8 +94,8 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
   };
 
   const onChooseOutputDir = async () => {
-    const selected = await open({ directory: true, multiple: false, title: "选择输出目录" });
-    if (typeof selected === "string") {
+    const selected = await chooseDirectory(i18n.t("settings.outputDir"));
+    if (selected) {
       params.setDraftSettings({ ...params.draftSettings, outputDir: selected });
     }
   };
@@ -104,12 +105,12 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     await params.persistSettings(next);
     params.setEditingProfileId(next.activeApiProfileId);
     params.setSettingsOpen(false);
-    params.setStatus("设置已保存");
+    params.setStatus("status.settingsSaved");
   };
 
   const onOpenApiSignup = async (provider: "pptokens" | "aifast" | "yunwu") => {
     try {
-      await invoke("open_api_signup_url", { provider });
+      await invokeCommand("open_api_signup_url", { provider });
     } catch (error) {
       params.setStatus(String(error));
     }
@@ -119,7 +120,7 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     const profile = params.createApiProfile();
     const next = {
       ...profile,
-      name: params.localModelName.trim() || "本地模型",
+      name: params.localModelName.trim() || i18n.t("settings.localModelDefaultName"),
       apiBaseUrl: params.localModelBaseUrl.trim() || "http://127.0.0.1:11434/v1",
       model: params.localModelId.trim() || "llava",
       apiKey: "",
@@ -131,7 +132,7 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     }));
     params.setEditingProfileId(next.id);
     params.setLocalModelOpen(false);
-    params.setStatus("本地模型已接入，请保存设置");
+    params.setStatus("status.localModelConnected");
   };
 
   return {

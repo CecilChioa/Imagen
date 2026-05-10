@@ -50,6 +50,11 @@ identifier = "allow-batch-convert-images"
 description = "Allows running batch image format conversion from the frontend."
 commands.allow = ["batch_convert_images"]
 
+[[permission]]
+identifier = "allow-batch-compose-images"
+description = "Allows running batch image composition from the frontend."
+commands.allow = ["batch_compose_images"]
+
 [default]
 description = "Default permissions for Imagen."
-permissions = ["allow-generate-image", "allow-load-settings", "allow-settings-exists", "allow-save-settings", "allow-save-generated-image", "allow-pick-random-reference-image", "allow-read-image-data-url", "allow-open-api-signup-url", "allow-open-qq-group-url", "allow-batch-convert-images"]
+permissions = ["allow-generate-image", "allow-load-settings", "allow-settings-exists", "allow-save-settings", "allow-save-generated-image", "allow-pick-random-reference-image", "allow-read-image-data-url", "allow-open-api-signup-url", "allow-open-qq-group-url", "allow-batch-convert-images", "allow-batch-compose-images"]

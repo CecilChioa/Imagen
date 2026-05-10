@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '\\(^|/\\)node_modules\\(/|$\\)')",
+      "Bash(npm run *)",
+      "Bash(cargo check *)"
+    ]
+  }
+}

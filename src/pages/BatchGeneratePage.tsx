@@ -1,6 +1,7 @@
 import { Button, NumberInput, Select, Textarea } from "@mantine/core";
+import { useTranslation } from "react-i18next";
+import { parseBatchPromptLines } from "../config/generation";
 import type { BatchItem, BatchMode } from "../types/app";
-
 type Props = {
   generationBusy: boolean;
   elapsedSeconds: number;
@@ -19,12 +20,18 @@ type Props = {
 };
 
 export function BatchGeneratePage(props: Props) {
-  const batchPromptTotal = props.batchPromptText.split(/\r?\n/).map((text) => text.trim()).filter(Boolean).length;
+  const { t } = useTranslation();
+  const batchPromptTotal = parseBatchPromptLines(props.batchPromptText).length;
   const totalCount = props.batchItems.length || batchPromptTotal;
-  const generatedCount = props.batchItems.filter((item) => item.status === "完成").length;
-  const remainingCount = props.batchItems.length
-    ? props.batchItems.filter((item) => item.status === "等待" || item.status === "生成中").length
-    : totalCount;
+
+  let generatedCount = 0;
+  let remainingCount = props.batchItems.length === 0 ? totalCount : 0;
+  if (props.batchItems.length > 0) {
+    for (const item of props.batchItems) {
+      if (item.statusCode === "done") generatedCount += 1;
+      if (item.statusCode === "pending" || item.statusCode === "running") remainingCount += 1;
+    }
+  }
 
   const filenameOf = (path?: string) => {
     if (!path) return "";
@@ -38,35 +45,35 @@ export function BatchGeneratePage(props: Props) {
       <section className="batch-panel">
         <div className="batch-header">
           <div>
-            <h2>批量生成</h2>
-            <span>每行一个正向提示词，会继承当前单图设置中的正向/负向提示词。</span>
+            <h2>{t("batch.title")}</h2>
+            <span>{t("batch.subtitle")}</span>
           </div>
           <Button className={props.generationBusy ? "stop-action" : "primary-action"} onClick={props.onBatchGenerate}>
-            {props.generationBusy ? "停止生成" : "开始生成"}
+            {props.generationBusy ? t("batch.stop") : t("batch.start")}
           </Button>
         </div>
         <Textarea
           className="batch-prompt-field"
           classNames={{ input: "batch-input" }}
           value={props.batchPromptText}
-          placeholder={"火焰风暴技能图标\n寒冰护盾技能图标\n暗影突袭技能图标"}
+          placeholder={t("batch.placeholder")}
           minRows={12}
           onChange={(e) => props.onBatchPromptTextChange(e.target.value)}
         />
         <div className="batch-options">
           <Select
-            label="执行模式"
+            label={t("batch.executionMode")}
             value={props.batchMode}
             data={[
-              { value: "queue", label: "队列" },
-              { value: "concurrent", label: "并发" },
+              { value: "queue", label: t("batch.queue") },
+              { value: "concurrent", label: t("batch.concurrent") },
             ]}
             onChange={(value) => value && props.onBatchModeChange(value as BatchMode)}
             allowDeselect={false}
           />
           {props.batchMode === "concurrent" && (
             <NumberInput
-              label="并发数"
+              label={t("batch.concurrency")}
               min={1}
               max={20}
               value={props.batchConcurrency}
@@ -75,16 +82,16 @@ export function BatchGeneratePage(props: Props) {
             />
           )}
           <Select
-            label="保存尺寸"
+            label={t("batch.saveSize")}
             value={props.saveSize}
             onChange={(value) => value && props.onSaveSizeChange(value)}
             data={[
-              { value: "original", label: "原始尺寸" },
+              { value: "original", label: t("common.originalSize") },
               { value: "64x64", label: "64x64" },
               { value: "128x128", label: "128x128" },
               { value: "256x256", label: "256x256" },
               { value: "512x512", label: "512x512" },
-              { value: "custom", label: "自定义" },
+              { value: "custom", label: t("common.custom") },
             ]}
             allowDeselect={false}
           />
@@ -93,23 +100,23 @@ export function BatchGeneratePage(props: Props) {
       <section className="batch-results">
         <section className="batch-result-list batch-generate-results">
           <div className="batch-result-status-row">
-            <strong>任务结果</strong>
-            <div className="batch-progress-counts" aria-label="批量生成进度">
-              <span>共 {totalCount} 个</span>
-              <span>已生成 {generatedCount}</span>
-              <span>剩余 {remainingCount}</span>
+            <strong>{t("batch.results")}</strong>
+            <div className="batch-progress-counts" aria-label={t("batch.progressAria")}>
+              <span>{t("batch.total", { count: totalCount })}</span>
+              <span>{t("batch.generated", { count: generatedCount })}</span>
+              <span>{t("batch.remaining", { count: remainingCount })}</span>
             </div>
-            <div className={props.generationBusy ? "timer-pill active" : "timer-pill"}>生成耗时: {props.elapsedSeconds}s</div>
+            <div className={props.generationBusy ? "timer-pill active" : "timer-pill"}>{t("batch.elapsed", { seconds: props.elapsedSeconds })}</div>
           </div>
           {props.batchItems.length === 0 ? (
-            <div className="batch-results-empty">生成结果会显示在这里</div>
+            <div className="batch-results-empty">{t("batch.empty")}</div>
           ) : props.batchItems.map((item) => (
             <button key={item.id} className="batch-result-line" title={item.path ?? item.error ?? item.fullPrompt} onClick={() => props.onBatchItemApply(item)}>
               <span className="batch-result-status">{item.status}</span>
               <strong className="batch-result-prompt">{item.prompt.replace(/\s+/g, " ")}</strong>
               <em className="batch-result-path">{item.path ? filenameOf(item.path) : (item.error ?? "")}</em>
               <div className="batch-result-thumb">
-                {item.previewDataUrl ? <img src={item.previewDataUrl} alt="缩略图" /> : <span>--</span>}
+                {item.previewDataUrl ? <img src={item.previewDataUrl} alt={t("batch.thumbnailAlt")} /> : <span>--</span>}
               </div>
             </button>
           ))}

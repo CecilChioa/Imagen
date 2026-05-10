@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ComponentProps } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { useTranslation } from "react-i18next";
 import { AppShell } from "./components/AppShell";
+import { initI18n } from "./i18n";
+import { appendBoundedLogs, CONVERT_LOG_LIMIT, GENERATE_LOG_LIMIT, resetBoundedLogs } from "./config/generation";
 import { contentTypes, stylePresets } from "./config/presets";
+import { createApiProfile, defaultApiProfile, defaultSettings, normalizeSettings } from "./config/settings";
+import { useBatchCompose } from "./hooks/useBatchCompose";
 import { useConvertSettings } from "./hooks/useConvertSettings";
 import { useGeneration } from "./hooks/useGeneration";
 import { useSettingsPersistenceEffects } from "./hooks/useSettingsPersistenceEffects";
 import { useProfilesAndPrompts } from "./hooks/useProfilesAndPrompts";
+import { chooseDirectory, chooseImageFile } from "./lib/filePickers";
+import { invokeCommand } from "./lib/tauri";
 import type {
   BatchConvertResult,
   BatchItem,
@@ -16,83 +21,9 @@ import type {
   SaveButtonState,
   Settings,
   ViewMode,
-  ApiProfile,
+  BlpEncoding,
 } from "./types/app";
 import "./styles.css";
-const defaultApiProfile: ApiProfile = {
-  id: "default",
-  name: "PPtokens",
-  apiKey: "",
-  apiBaseUrl: "https://api.openai.com/v1",
-  model: "gpt-image-2",
-};
-
-const defaultSettings: Settings = {
-  schemaVersion: 1,
-  apiProfiles: [defaultApiProfile],
-  activeApiProfileId: defaultApiProfile.id,
-  outputDir: "outputs",
-  size: "1024x1024",
-  quality: "medium",
-  outputFormat: "png",
-  removeBackground: false,
-  n: 1,
-  positivePrompt: "",
-  negativePrompt: "",
-  positivePromptLibrary: [],
-  negativePromptLibrary: [],
-  stylePreset: "none",
-  contentType: "icon",
-  referenceLibraryDir: "",
-  referenceImagePath: "",
-  maskImagePath: "",
-  history: [],
-  convertSourceDir: "",
-  convertTargetDir: "",
-  convertSourceFormats: ["png"],
-  convertTargetFormat: "blp",
-  convertRecursive: true,
-  convertKeepStructure: true,
-  convertTgaBits: 32,
-  convertTgaRle: true,
-  convertBlpEncoding: "raw1",
-  convertBlpAlphaBits: 8,
-  convertBlpJpegAlpha: false,
-  convertBlpMakeMipmaps: true,
-  convertBlpFilter: "nearest",
-  convertAlphaMode: "passthrough",
-  convertAlphaThreshold: 128,
-  convertPngCompression: "default",
-  convertPngFilter: "adaptive",
-};
-
-const normalizeSettings = (raw: Partial<Settings>): Settings => {
-  const profiles =
-    raw.apiProfiles && raw.apiProfiles.length > 0
-      ? raw.apiProfiles
-      : [defaultApiProfile];
-
-  const active =
-    profiles.find((profile) => profile.id === raw.activeApiProfileId)?.id ??
-    profiles[0].id;
-
-  return {
-    ...defaultSettings,
-    ...raw,
-    apiProfiles: profiles,
-    activeApiProfileId: active,
-    positivePromptLibrary: raw.positivePromptLibrary ?? [],
-    negativePromptLibrary: raw.negativePromptLibrary ?? [],
-    history: (raw.history ?? []).slice(0, 10),
-  };
-};
-
-const createApiProfile = (): ApiProfile => ({
-  ...defaultApiProfile,
-  id: crypto.randomUUID(),
-  name: "新 API",
-});
-
 const formatLog = (value: unknown) => JSON.stringify(value, null, 2);
 
 const stripPresetPrompts = (source: string) => {
@@ -112,6 +43,7 @@ const stripPresetPrompts = (source: string) => {
 };
 
 export default function App() {
+  const { t } = useTranslation();
   // UI 状态
   const [view, setView] = useState<ViewMode>("single");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -124,10 +56,10 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [draftSettings, setDraftSettings] = useState<Settings>(defaultSettings);
   const [editingProfileId, setEditingProfileId] = useState(defaultApiProfile.id);
-  const [status, setStatus] = useState("就绪");
+  const [status, setStatus] = useState("");
 
-  const [generateLogs, setGenerateLogs] = useState<string[]>(["等待生成任务..."]);
-  const [convertLogs, setConvertLogs] = useState<string[]>(["等待转换任务..."]);
+  const [generateLogs, setGenerateLogs] = useState<string[]>([]);
+  const [convertLogs, setConvertLogs] = useState<string[]>([]);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationResult[]>([]);
 
@@ -149,6 +81,9 @@ export default function App() {
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [batchMode, setBatchMode] = useState<BatchMode>("queue");
   const [batchConcurrency, setBatchConcurrency] = useState(5);
+  const onBlpEncodingChange = (value: BlpEncoding) => {
+    setConvertBlpEncoding(value);
+  };
   const {
     convertSourceDir,
     setConvertSourceDir,
@@ -169,10 +104,10 @@ export default function App() {
     setConvertBlpEncoding,
     convertBlpAlphaBits,
     setConvertBlpAlphaBits,
-    convertBlpJpegAlpha,
-    setConvertBlpJpegAlpha,
-    convertBlpMakeMipmaps,
-    setConvertBlpMakeMipmaps,
+    convertBlpJpegQuality,
+    setConvertBlpJpegQuality,
+    convertBlpMipmapCount,
+    setConvertBlpMipmapCount,
     convertBlpFilter,
     setConvertBlpFilter,
     convertAlphaMode,
@@ -187,7 +122,7 @@ export default function App() {
     currentConvertSettings,
     toggleConvertSourceFormat,
   } = useConvertSettings(defaultSettings);
-  const [localModelName, setLocalModelName] = useState("本地模型 - Ollama");
+  const [localModelName, setLocalModelName] = useState("Ollama");
   const [localModelBaseUrl, setLocalModelBaseUrl] = useState("http://127.0.0.1:11434/v1");
   const [localModelId, setLocalModelId] = useState("llava");
 
@@ -222,6 +157,34 @@ export default function App() {
     normalizeSettings,
   });
 
+  const {
+    composeLogs,
+    composeBusy,
+    composeBaseDir,
+    composeLowerOverlayPath,
+    composeUpperOverlayPath,
+    composeTargetDir,
+    composeRecursive,
+    composeKeepStructure,
+    setComposeRecursive,
+    setComposeKeepStructure,
+    onChooseComposeBaseDir,
+    onChooseComposeLowerOverlay,
+    onChooseComposeUpperOverlay,
+    onClearComposeLowerOverlay,
+    onClearComposeUpperOverlay,
+    onChooseComposeTargetDir,
+    onBatchCompose,
+  } = useBatchCompose({
+    settings,
+    persistSettings,
+    setStatus,
+  });
+
+  useEffect(() => {
+    initI18n(settings.language);
+  }, [settings.language]);
+
   useEffect(() => {
     if (!generationBusy || generationStartedAt == null) {
       return;
@@ -229,7 +192,7 @@ export default function App() {
 
     const timer = window.setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - generationStartedAt) / 1000));
-    }, 250);
+    }, 1000);
 
     return () => window.clearInterval(timer);
   }, [generationBusy, generationStartedAt]);
@@ -247,22 +210,8 @@ export default function App() {
     return { width, height };
   };
 
-  const chooseDirectory = async (title: string) => {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title,
-    });
-
-    return typeof selected === "string" ? selected : "";
-  };
-
   const onChooseReferenceImage = async () => {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "tga", "bmp"] }],
-      title: "选择参考图",
-    });
+    const selected = await chooseImageFile(t("single.referenceImage"));
 
     if (typeof selected === "string") {
       persistSettingsDebounced({
@@ -273,11 +222,7 @@ export default function App() {
   };
 
   const onChooseMaskImage = async () => {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "tga", "bmp"] }],
-      title: "选择蒙版图",
-    });
+    const selected = await chooseImageFile(t("single.maskImage"));
 
     if (typeof selected === "string") {
       persistSettingsDebounced({
@@ -288,7 +233,7 @@ export default function App() {
   };
 
   const onChooseReferenceLibraryDir = async () => {
-    const dir = await chooseDirectory("选择参考图库文件夹");
+    const dir = await chooseDirectory(t("single.referenceLibrary"));
     if (!dir) return;
 
     persistSettingsDebounced({
@@ -354,14 +299,14 @@ export default function App() {
     setSaveButtonState("saving");
 
     try {
-      const path = await invoke<string>("save_generated_image", {
+      const path = await invokeCommand<string>("save_generated_image", {
         request: { settings, dataUrl: previewSrc, width, height },
       });
 
       setSaveButtonState("saved");
-      setSaveNotice(`保存成功：${path}`);
-      setGenerateLogs((current) => [...current, path]);
-      setStatus("保存完成");
+      setSaveNotice(path);
+      setGenerateLogs((current) => appendBoundedLogs(current, path, GENERATE_LOG_LIMIT));
+      setStatus("status.saveCompleted");
 
       window.setTimeout(() => {
         setSaveButtonState((state) => (state === "saved" ? "resave" : state));
@@ -381,7 +326,7 @@ export default function App() {
 
   const applyContentType = (id: string) => {
     setSettings({
-    ...settings,
+      ...settings,
       contentType: id,
     });
   };
@@ -390,7 +335,7 @@ export default function App() {
     if (convertBusy) return;
 
     if (!convertSourceDir.trim() || !convertTargetDir.trim() || convertSourceFormats.length === 0) {
-      setStatus("请完善转换参数");
+      setStatus("status.convertParamsRequired");
       return;
     }
 
@@ -398,29 +343,35 @@ export default function App() {
     await persistSettings(nextSettings);
 
     setConvertBusy(true);
-    setConvertLogs([
-      "开始批量转换...",
-      formatLog({
-        sourceDir: convertSourceDir,
-        targetDir: convertTargetDir,
-        sourceFormats: convertSourceFormats,
-        targetFormat: convertTargetFormat,
-        tgaBits: convertTgaBits,
-        tgaRle: convertTgaRle,
-        blpEncoding: convertBlpEncoding,
-        blpAlphaBits: convertBlpAlphaBits,
-        blpJpegAlpha: convertBlpJpegAlpha,
-        blpMakeMipmaps: convertBlpMakeMipmaps,
-        blpFilter: convertBlpFilter,
-        alphaMode: convertAlphaMode,
-        alphaThreshold: convertAlphaThreshold,
-        pngCompression: convertPngCompression,
-        pngFilter: convertPngFilter,
-      }),
-    ]);
+    setConvertLogs(() =>
+      resetBoundedLogs(
+        [
+          `batch_convert:start`,
+          formatLog({
+            sourceDir: convertSourceDir,
+            targetDir: convertTargetDir,
+            sourceFormats: convertSourceFormats,
+            targetFormat: convertTargetFormat,
+            tgaBits: convertTgaBits,
+            tgaRle: convertTgaRle,
+            blpEncoding: convertBlpEncoding,
+            blpAlphaBits: convertBlpAlphaBits,
+            blpJpegAlpha: true,
+            blpJpegQuality: convertBlpJpegQuality,
+            blpMipmapCount: convertBlpMipmapCount,
+            blpFilter: convertBlpFilter,
+            alphaMode: convertAlphaMode,
+            alphaThreshold: convertAlphaThreshold,
+            pngCompression: convertPngCompression,
+            pngFilter: convertPngFilter,
+          }),
+        ],
+        CONVERT_LOG_LIMIT,
+      ),
+    );
 
     try {
-      const result = await invoke<BatchConvertResult>("batch_convert_images", {
+      const result = await invokeCommand<BatchConvertResult>("batch_convert_images", {
         request: {
           sourceDir: convertSourceDir,
           targetDir: convertTargetDir,
@@ -430,8 +381,9 @@ export default function App() {
           keepStructure: convertKeepStructure,
           blpEncoding: convertBlpEncoding,
           blpAlphaBits: convertBlpAlphaBits,
-          blpJpegAlpha: convertBlpJpegAlpha,
-          blpMakeMipmaps: convertBlpMakeMipmaps,
+          blpJpegAlpha: true,
+          blpJpegQuality: convertBlpJpegQuality,
+          blpMipmapCount: convertBlpMipmapCount,
           blpFilter: convertBlpFilter,
           alphaMode: convertAlphaMode,
           alphaThreshold: convertAlphaThreshold,
@@ -442,13 +394,15 @@ export default function App() {
         },
       });
 
-      setConvertLogs((current) => [
-        ...current,
-        `完成：成功 ${result.converted} / 失败 ${result.failed}`,
-        ...result.errors.slice(0, 100),
-      ]);
+      setConvertLogs((current) =>
+        appendBoundedLogs(
+          current,
+          [`batch_convert:done converted=${result.converted} failed=${result.failed}`, ...result.errors.slice(0, 100)],
+          CONVERT_LOG_LIMIT,
+        ),
+      );
     } catch (error) {
-      setConvertLogs((current) => [...current, `失败：${String(error)}`]);
+      setConvertLogs((current) => appendBoundedLogs(current, `error:${String(error)}`, CONVERT_LOG_LIMIT));
       setStatus(String(error));
     } finally {
       setConvertBusy(false);
@@ -457,7 +411,7 @@ export default function App() {
   const onPickReferenceFromLibrary = async () => {
     const next = await pickReferenceFromLibrary(settings);
     await persistSettings(next);
-    setStatus("已随机抽取参考图");
+    setStatus("status.referencePicked");
   };
 
   const onClearReferenceLibraryDir = async () => {
@@ -490,7 +444,7 @@ export default function App() {
   };
 
   const onChooseConvertSourceDir = async () => {
-    const dir = await chooseDirectory("选择源文件夹");
+    const dir = await chooseDirectory(t("convert.sourceDir"));
     if (!dir) return;
 
     setConvertSourceDir(dir);
@@ -501,7 +455,7 @@ export default function App() {
   };
 
   const onChooseConvertTargetDir = async () => {
-    const dir = await chooseDirectory("选择目标文件夹");
+    const dir = await chooseDirectory(t("convert.targetDir"));
     if (!dir) return;
 
     setConvertTargetDir(dir);
@@ -574,8 +528,8 @@ export default function App() {
     convertTgaRle,
     convertBlpEncoding,
     convertBlpAlphaBits,
-    convertBlpJpegAlpha,
-    convertBlpMakeMipmaps,
+    convertBlpJpegQuality,
+    convertBlpMipmapCount,
     convertBlpFilter,
     convertAlphaMode,
     convertAlphaThreshold,
@@ -590,16 +544,36 @@ export default function App() {
     onKeepStructureChange: setConvertKeepStructure,
     onTgaBitsChange: setConvertTgaBits,
     onTgaRleChange: setConvertTgaRle,
-    onBlpEncodingChange: setConvertBlpEncoding,
+    onBlpEncodingChange,
     onBlpAlphaBitsChange: setConvertBlpAlphaBits,
-    onBlpJpegAlphaChange: setConvertBlpJpegAlpha,
-    onBlpMakeMipmapsChange: setConvertBlpMakeMipmaps,
+    onBlpJpegQualityChange: setConvertBlpJpegQuality,
+    onBlpMipmapCountChange: setConvertBlpMipmapCount,
     onBlpFilterChange: setConvertBlpFilter,
     onAlphaModeChange: setConvertAlphaMode,
     onAlphaThresholdChange: setConvertAlphaThreshold,
     onPngCompressionChange: setConvertPngCompression,
     onPngFilterChange: setConvertPngFilter,
     onBatchConvert,
+  };
+
+  const composePageProps = {
+    composeBusy,
+    composeBaseDir,
+    composeLowerOverlayPath,
+    composeUpperOverlayPath,
+    composeTargetDir,
+    composeRecursive,
+    composeKeepStructure,
+    composeLogs,
+    onChooseBaseDir: onChooseComposeBaseDir,
+    onChooseLowerOverlay: onChooseComposeLowerOverlay,
+    onChooseUpperOverlay: onChooseComposeUpperOverlay,
+    onClearLowerOverlay: onClearComposeLowerOverlay,
+    onClearUpperOverlay: onClearComposeUpperOverlay,
+    onChooseTargetDir: onChooseComposeTargetDir,
+    onComposeRecursiveChange: setComposeRecursive,
+    onComposeKeepStructureChange: setComposeKeepStructure,
+    onBatchCompose,
   };
 
   const shellBaseProps = {
@@ -648,10 +622,18 @@ export default function App() {
     ...singlePageProps,
     ...batchPageProps,
     ...convertPageProps,
+    ...composePageProps,
     generateLogs,
     convertLogs,
+    composeLogs,
     onChooseConvertSourceDir,
     onChooseConvertTargetDir,
+    onChooseComposeBaseDir,
+    onChooseComposeLowerOverlay,
+    onChooseComposeUpperOverlay,
+    onClearComposeLowerOverlay,
+    onClearComposeUpperOverlay,
+    onChooseComposeTargetDir,
   } satisfies ComponentProps<typeof AppShell>;
 
   return <AppShell {...appShellProps} />;
