@@ -243,9 +243,9 @@ label {
   backdrop-filter: blur(18px);
 }
 
-.panel-section,
 .style-library-card,
 .batch-panel,
+.panel-section,
 .batch-result-list,
 .log-panel,
 .history-workspace {
@@ -299,10 +299,6 @@ label {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border: 1px solid #30313a;
-  border-radius: 8px;
-  background: #15161c;
-  padding: 12px;
 }
 
 .style-type-grid {
@@ -429,8 +425,23 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.panel-subtitle,
+.prompt-toolbar > span,
+.style-type-grid .mantine-InputWrapper-label,
+.path-picker-mantine .mantine-InputWrapper-label {
+  display: block;
+  margin: 0 0 4px;
   color: #f1f1f4;
+  font-size: 16px;
+  line-height: 1.35;
   font-weight: 800;
+  text-align: left;
+}
+
+.image-to-image-section {
+  gap: 4px;
 }
 
 .prompt-library-actions {
@@ -569,6 +580,8 @@ label {
 
 .preview-stage {
   display: grid;
+  width: min(100%, 620px);
+  align-self: center;
   flex: 1 1 auto;
   min-height: 0;
   place-items: center;
@@ -695,6 +708,8 @@ label {
 
 .operation-row {
   display: grid;
+  width: min(100%, 620px);
+  align-self: center;
   grid-template-columns: minmax(260px, 1fr) 168px;
   align-items: center;
   gap: 12px;

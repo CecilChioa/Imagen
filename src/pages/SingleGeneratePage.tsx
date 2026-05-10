@@ -108,7 +108,6 @@ export function SingleGeneratePage(props: Props) {
       <main className="lab-layout">
         <aside className="lab-panel">
           <section className="panel-section">
-            <div className="style-library-card">
               <div className="style-type-grid">
                 <Select
                   label={t("single.contentType")}
@@ -139,11 +138,10 @@ export function SingleGeneratePage(props: Props) {
                   {t("single.clearLibrary")}
                 </Button>
               </div>
-            </div>
           </section>
 
-          <section className="panel-section">
-            <h2>{t("single.imageToImage")}</h2>
+          <section className="panel-section image-to-image-section">
+            <div className="panel-subtitle">{t("single.imageToImage")}</div>
             <div className="image-picker-grid">
               <button className={settings.referenceImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.referenceImagePath ? props.onSettingsChange({ ...settings, referenceImagePath: "" }) : props.onChooseReferenceImage())}>
                 {referencePreviewSrc ? <img src={referencePreviewSrc} alt={t("single.referenceImageAlt")} /> : null}
