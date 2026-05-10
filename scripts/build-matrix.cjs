@@ -38,13 +38,14 @@ if (!targets.length) {
 
 (async () => {
   const distRoot = path.join(root, "dist-release", version);
+  const logsRoot = path.join(root, "target", "build-logs", version);
   fs.mkdirSync(distRoot, { recursive: true });
-  fs.copyFileSync(targetsConfigPath, path.join(distRoot, "build-targets.json"));
+  fs.mkdirSync(logsRoot, { recursive: true });
 
   for (const target of targets) {
     const targetName = target.name || target.triple;
     const targetDir = path.join(distRoot, targetName);
-    const logPath = path.join(targetDir, "tauri-build.log");
+    const logPath = path.join(logsRoot, `${targetName}.log`);
     fs.rmSync(targetDir, { recursive: true, force: true });
     fs.mkdirSync(targetDir, { recursive: true });
 
@@ -75,33 +76,15 @@ if (!targets.length) {
       process.exit(1);
     }
 
-    const bundlePath = path.join(releaseDir, "bundle");
     const executableName = target.executableName || (target.triple.includes("windows") ? "imagen.exe" : "imagen");
     const executablePath = path.join(releaseDir, executableName);
 
-    if (fs.existsSync(executablePath)) {
-      fs.copyFileSync(executablePath, path.join(targetDir, path.basename(executableName)));
+    if (!fs.existsSync(executablePath)) {
+      console.error(`Unable to locate executable for ${target.triple}: ${path.relative(root, executablePath)}`);
+      process.exit(1);
     }
 
-    if (fs.existsSync(bundlePath)) {
-      copyDirectory(bundlePath, path.join(targetDir, "bundle"));
-    }
-
-    fs.writeFileSync(
-      path.join(targetDir, "build-meta.json"),
-      `${JSON.stringify(
-        {
-          version,
-          target: target.triple,
-          name: targetName,
-          executable: fs.existsSync(executablePath) ? path.basename(executableName) : null,
-          builtAt: new Date().toISOString(),
-        },
-        null,
-        2,
-      )}\n`,
-      "utf8",
-    );
+    fs.copyFileSync(executablePath, path.join(targetDir, path.basename(executableName)));
   }
 })().catch((error) => {
   console.error(error);
@@ -160,17 +143,4 @@ function findReleaseDir(rootDir, targetTriple) {
   }
 
   return null;
-}
-
-function copyDirectory(source, target) {
-  fs.mkdirSync(target, { recursive: true });
-  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
-    const from = path.join(source, entry.name);
-    const to = path.join(target, entry.name);
-    if (entry.isDirectory()) {
-      copyDirectory(from, to);
-    } else {
-      fs.copyFileSync(from, to);
-    }
-  }
 }
