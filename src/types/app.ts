@@ -8,9 +8,15 @@ export type StatusMessage = {
   raw?: string;
 };
 
+export type ApiProvider = "openai_compatible" | "gemini_native";
+export type ModerationLevel = "auto" | "low";
+export type BackgroundMode = "auto" | "transparent" | "opaque";
+
 export type ApiProfile = {
   id: string;
   name: string;
+  provider: ApiProvider;
+  apiVersion?: string;
   apiKey: string;
   apiBaseUrl: string;
   model: string;
@@ -48,7 +54,7 @@ export type PngFilter = "adaptive" | "none" | "sub" | "up" | "avg" | "paeth";
 export type BlpJpegQuality = number;
 export type BlpMipmapCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
 
-export type BatchItemStatus = "pending" | "running" | "done" | "failed";
+export type BatchItemStatus = "pending" | "running" | "done" | "failed" | "cancelled";
 
 export type BatchItem = {
   id: string;
@@ -85,6 +91,10 @@ export type Settings = {
   size: string;
   quality: string;
   outputFormat: string;
+  timeoutSec: number;
+  outputCompression: number;
+  moderation: ModerationLevel;
+  background: BackgroundMode;
   removeBackground: boolean;
   n: number;
   positivePrompt: string;

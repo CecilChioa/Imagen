@@ -177,10 +177,10 @@
       "description": "Permission identifier",
       "oneOf": [
         {
-          "description": "Default permissions for Imagen.\n#### This default permission set includes:\n\n- `allow-generate-image`\n- `allow-load-settings`\n- `allow-settings-exists`\n- `allow-save-settings`\n- `allow-save-generated-image`\n- `allow-pick-random-reference-image`\n- `allow-read-image-data-url`\n- `allow-open-api-signup-url`\n- `allow-open-qq-group-url`\n- `allow-batch-convert-images`\n- `allow-batch-compose-images`",
+          "description": "Default permissions for Imagen.\n#### This default permission set includes:\n\n- `allow-generate-image`\n- `allow-cancel-generation`\n- `allow-load-settings`\n- `allow-settings-exists`\n- `allow-save-settings`\n- `allow-save-generated-image`\n- `allow-pick-random-reference-image`\n- `allow-read-image-data-url`\n- `allow-open-api-signup-url`\n- `allow-open-qq-group-url`\n- `allow-batch-convert-images`\n- `allow-batch-compose-images`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for Imagen.\n#### This default permission set includes:\n\n- `allow-generate-image`\n- `allow-load-settings`\n- `allow-settings-exists`\n- `allow-save-settings`\n- `allow-save-generated-image`\n- `allow-pick-random-reference-image`\n- `allow-read-image-data-url`\n- `allow-open-api-signup-url`\n- `allow-open-qq-group-url`\n- `allow-batch-convert-images`\n- `allow-batch-compose-images`"
+          "markdownDescription": "Default permissions for Imagen.\n#### This default permission set includes:\n\n- `allow-generate-image`\n- `allow-cancel-generation`\n- `allow-load-settings`\n- `allow-settings-exists`\n- `allow-save-settings`\n- `allow-save-generated-image`\n- `allow-pick-random-reference-image`\n- `allow-read-image-data-url`\n- `allow-open-api-signup-url`\n- `allow-open-qq-group-url`\n- `allow-batch-convert-images`\n- `allow-batch-compose-images`"
         },
         {
           "description": "Allows running batch image composition from the frontend.",
@@ -193,6 +193,12 @@
           "type": "string",
           "const": "allow-batch-convert-images",
           "markdownDescription": "Allows running batch image format conversion from the frontend."
+        },
+        {
+          "description": "Allows cancelling in-flight image generation from the frontend.",
+          "type": "string",
+          "const": "allow-cancel-generation",
+          "markdownDescription": "Allows cancelling in-flight image generation from the frontend."
         },
         {
           "description": "Allows generating images from the frontend.",

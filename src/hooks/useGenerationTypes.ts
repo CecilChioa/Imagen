@@ -1,5 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { ApiProfile, BatchItem, BatchMode, GenerationResult, Settings } from "../types/app";
+import type { ApiProfile, BatchItem, BatchMode, GenerationResult, Settings, StatusMessage } from "../types/app";
 
 export type GenerationParams = {
   settings: Settings;
@@ -12,11 +12,12 @@ export type GenerationParams = {
   setGenerationStartedAt: (value: number | null) => void;
   setElapsedSeconds: (value: number) => void;
   setGenerateLogs: Dispatch<SetStateAction<string[]>>;
-  setStatus: (value: string) => void;
+  setStatus: (value: StatusMessage | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setSettings: Dispatch<SetStateAction<Settings>>;
   setBatchItems: Dispatch<SetStateAction<BatchItem[]>>;
   setPreviewSrc: (value: string | null) => void;
+  setPreviewList: (value: string[]) => void;
   setSaveButtonState: (value: "idle" | "saving" | "saved" | "resave") => void;
   setHistory: (value: GenerationResult[]) => void;
   persistSettings: (next: Settings) => Promise<void>;
@@ -30,6 +31,7 @@ export type SaveHistoryResult = (result: GenerationResult, base?: Settings) => P
 export type SingleGenerationOptions = {
   params: GenerationParams;
   generationRunIdRef: MutableRefObject<number>;
+  activeCancellationIdRef: MutableRefObject<string | null>;
   composePositivePrompt: ComposePositivePrompt;
   pickReferenceFromLibrary: PickReferenceFromLibrary;
   saveHistoryResult: SaveHistoryResult;
@@ -38,5 +40,6 @@ export type SingleGenerationOptions = {
 export type BatchGenerationOptions = {
   params: GenerationParams;
   generationRunIdRef: MutableRefObject<number>;
+  activeCancellationIdRef: MutableRefObject<string | null>;
   composePositivePrompt: ComposePositivePrompt;
 };

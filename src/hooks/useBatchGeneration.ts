@@ -1,21 +1,42 @@
 import { GENERATE_LOG_LIMIT, parseBatchPromptLines, resetBoundedLogs } from "../config/generation";
 import i18n from "../i18n";
-import { invokeCommand } from "../lib/tauri";
+import { invokeCommand, isCancelledError } from "../lib/tauri";
 import type { BatchItem, GenerationResult } from "../types/app";
 import type { BatchGenerationOptions } from "./useGenerationTypes";
 
-export const useBatchGeneration = ({ params, generationRunIdRef, composePositivePrompt }: BatchGenerationOptions) => {
+export const useBatchGeneration = ({
+  params,
+  generationRunIdRef,
+  activeCancellationIdRef,
+  composePositivePrompt,
+}: BatchGenerationOptions) => {
   const onBatchGenerate = async () => {
     if (params.generationBusy) {
+      const cancellationId = activeCancellationIdRef.current;
+      if (cancellationId) {
+        try {
+          await invokeCommand("cancel_generation", { cancellationId });
+        } catch {
+          // ignore cancellation command failure
+        }
+      }
+      activeCancellationIdRef.current = null;
       generationRunIdRef.current += 1;
       params.setGenerationBusy(false);
-      params.setStatus("status.batchGenerationStopped");
+      params.setBatchItems((current) =>
+        current.map((item) =>
+          item.statusCode === "done" || item.statusCode === "failed"
+            ? item
+            : { ...item, status: "", statusCode: "cancelled", error: undefined },
+        ),
+      );
+      params.setStatus({ tone: "warning", key: "status.batchGenerationStopped" });
       return;
     }
 
     const prompts = parseBatchPromptLines(params.batchPromptText);
     if (!prompts.length) {
-      params.setStatus("status.batchPromptRequired");
+      params.setStatus({ tone: "warning", key: "status.batchPromptRequired" });
       return;
     }
 
@@ -41,7 +62,9 @@ export const useBatchGeneration = ({ params, generationRunIdRef, composePositive
     );
 
     const runId = generationRunIdRef.current + 1;
+    const cancellationId = crypto.randomUUID();
     generationRunIdRef.current = runId;
+    activeCancellationIdRef.current = cancellationId;
     const concurrency = params.batchMode === "concurrent" ? Math.max(1, Math.min(20, params.batchConcurrency || 1)) : 1;
 
     const updateBatchItem = (id: string, updater: (item: BatchItem) => BatchItem) => {
@@ -67,7 +90,12 @@ export const useBatchGeneration = ({ params, generationRunIdRef, composePositive
       );
       try {
         const base = { ...params.settings, positivePrompt: item.fullPrompt, negativePrompt: item.negativePrompt, n: 1 };
-        const result = await invokeCommand<GenerationResult>("generate_image", { settings: base });
+        const result = await invokeCommand<GenerationResult>("generate_image", {
+          request: {
+            settings: base,
+            cancellationId,
+          },
+        });
         const dataUrl = result.outputs[0]?.dataUrl ?? "";
         let path = "";
         if (dataUrl) {
@@ -83,6 +111,10 @@ export const useBatchGeneration = ({ params, generationRunIdRef, composePositive
           error: undefined,
         }));
       } catch (error) {
+        if (isCancelledError(error)) {
+          updateBatchItem(item.id, (currentItem) => ({ ...currentItem, status: "", statusCode: "cancelled", error: undefined }));
+          return;
+        }
         updateBatchItem(item.id, (currentItem) => ({ ...currentItem, status: "", statusCode: "failed", error: String(error) }));
       }
     };
@@ -106,10 +138,13 @@ export const useBatchGeneration = ({ params, generationRunIdRef, composePositive
         );
       }
     } finally {
+      if (activeCancellationIdRef.current === cancellationId) {
+        activeCancellationIdRef.current = null;
+      }
       if (generationRunIdRef.current === runId) {
         params.setGenerationBusy(false);
         params.setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-        params.setStatus("status.batchGenerationCompleted");
+        params.setStatus({ tone: "success", key: "status.batchGenerationCompleted" });
       }
     }
   };

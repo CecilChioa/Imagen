@@ -1,7 +1,9 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -15,6 +17,8 @@ use chrono::Local;
 use image_ops::{BatchComposeRequest, BatchComposeResult, BatchConvertRequest, BatchConvertResult};
 use serde::{Deserialize, Serialize};
 use settings::{GenerationResult, Settings};
+use tauri::State;
+use tokio::sync::watch;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +28,61 @@ pub struct SaveImageRequest {
     pub data_url: String,
     pub width: u32,
     pub height: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateImageRequest {
+    pub settings: Settings,
+    pub cancellation_id: String,
+}
+
+struct CancelEntry {
+    sender: watch::Sender<bool>,
+    active_count: usize,
+}
+
+#[derive(Default)]
+pub struct CancelRegistry {
+    entries: Mutex<HashMap<String, CancelEntry>>,
+}
+
+impl CancelRegistry {
+    pub fn register(&self, cancellation_id: &str) -> watch::Receiver<bool> {
+        let mut entries = self.entries.lock().expect("cancel registry mutex poisoned");
+        if let Some(entry) = entries.get_mut(cancellation_id) {
+            entry.active_count += 1;
+            return entry.sender.subscribe();
+        }
+
+        let (sender, receiver) = watch::channel(false);
+        entries.insert(
+            cancellation_id.to_string(),
+            CancelEntry {
+                sender,
+                active_count: 1,
+            },
+        );
+        receiver
+    }
+
+    pub fn cancel(&self, cancellation_id: &str) {
+        let entries = self.entries.lock().expect("cancel registry mutex poisoned");
+        if let Some(entry) = entries.get(cancellation_id) {
+            let _ = entry.sender.send(true);
+        }
+    }
+
+    pub fn release(&self, cancellation_id: &str) {
+        let mut entries = self.entries.lock().expect("cancel registry mutex poisoned");
+        if let Some(entry) = entries.get_mut(cancellation_id) {
+            if entry.active_count > 1 {
+                entry.active_count -= 1;
+                return;
+            }
+        }
+        entries.remove(cancellation_id);
+    }
 }
 
 #[tauri::command]
@@ -124,12 +183,26 @@ fn open_external_url(url: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn generate_image(settings: Settings) -> Result<GenerationResult, String> {
-    image_generation::generate_image(settings).await
+async fn generate_image(
+    request: GenerateImageRequest,
+    cancel_registry: State<'_, CancelRegistry>,
+) -> Result<GenerationResult, String> {
+    image_generation::generate_image(
+        request.settings,
+        request.cancellation_id,
+        cancel_registry.inner(),
+    )
+    .await
+}
+
+#[tauri::command]
+fn cancel_generation(cancellation_id: String, cancel_registry: State<'_, CancelRegistry>) {
+    cancel_registry.cancel(&cancellation_id);
 }
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(CancelRegistry::default())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             settings_exists,
@@ -140,6 +213,7 @@ pub fn run() {
             open_api_signup_url,
             open_qq_group_url,
             generate_image,
+            cancel_generation,
             save_generated_image,
             batch_convert_images,
             batch_compose_images

@@ -1,28 +1,31 @@
 import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { commandErrorMessage, invokeCommand } from "../lib/tauri";
-import type { GenerationResult, Settings } from "../types/app";
+import type { GenerationResult, Settings, StatusMessage } from "../types/app";
 
 type Params = {
   settings: Settings;
   saveNotice: string;
-  status: string;
+  status: StatusMessage | null;
   setSettings: Dispatch<SetStateAction<Settings>>;
   setDraftSettings: Dispatch<SetStateAction<Settings>>;
   setEditingProfileId: (id: string) => void;
   setHistory: (value: GenerationResult[]) => void;
   setSettingsOpen: (open: boolean) => void;
   setSaveNotice: (value: string) => void;
-  setStatus: (value: string) => void;
+  setStatus: (value: StatusMessage | null) => void;
   setReferencePreviewSrc: (value: string) => void;
   setMaskPreviewSrc: (value: string) => void;
   applyConvertSettings: (next: Settings) => void;
   normalizeSettings: (raw: Partial<Settings>) => Settings;
 };
 
+type PersistSettingsOptions = {
+  debounceMs?: number;
+};
+
 type ReturnValue = {
-  persistSettings: (next: Settings) => Promise<void>;
-  persistSettingsDebounced: (next: Settings, delay?: number) => void;
+  persistSettings: (next: Settings, options?: PersistSettingsOptions) => Promise<void>;
 };
 
 export function useSettingsPersistenceEffects(params: Params): ReturnValue {
@@ -84,31 +87,38 @@ export function useSettingsPersistenceEffects(params: Params): ReturnValue {
 
   useEffect(() => {
     if (!status) return;
-    const timer = window.setTimeout(() => setStatus(""), 5000);
+    const timer = window.setTimeout(() => setStatus(null), 5000);
     return () => window.clearTimeout(timer);
   }, [status]);
 
-  const persistSettings = async (next: Settings) => {
-    setSettings(next);
-    setDraftSettings(next);
-    await invokeCommand("save_settings", { settings: next });
-  };
-
   const persistTimerRef = useRef<number | null>(null);
-  const persistSettingsDebounced = (next: Settings, delay = 300) => {
+
+  const persistSettings = async (next: Settings, options?: PersistSettingsOptions) => {
     setSettings(next);
     setDraftSettings(next);
+
+    const debounceMs = options?.debounceMs ?? 0;
     if (persistTimerRef.current != null) {
       window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
     }
-    persistTimerRef.current = window.setTimeout(() => {
-      invokeCommand("save_settings", { settings: next })
-        .catch((error) => setStatus(commandErrorMessage(error)))
-        .finally(() => {
-          persistTimerRef.current = null;
-        });
-    }, delay);
+
+    if (debounceMs <= 0) {
+      await invokeCommand("save_settings", { settings: next });
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      persistTimerRef.current = window.setTimeout(() => {
+        invokeCommand("save_settings", { settings: next })
+          .catch((error) => setStatus({ tone: "warning", raw: commandErrorMessage(error) }))
+          .finally(() => {
+            persistTimerRef.current = null;
+            resolve();
+          });
+      }, debounceMs);
+    });
   };
 
-  return { persistSettings, persistSettingsDebounced };
+  return { persistSettings };
 }

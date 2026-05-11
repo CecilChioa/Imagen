@@ -6,6 +6,11 @@ description = "Allows generating images from the frontend."
 commands.allow = ["generate_image"]
 
 [[permission]]
+identifier = "allow-cancel-generation"
+description = "Allows cancelling in-flight image generation from the frontend."
+commands.allow = ["cancel_generation"]
+
+[[permission]]
 identifier = "allow-load-settings"
 description = "Allows loading settings from the frontend."
 commands.allow = ["load_settings"]
@@ -57,4 +62,4 @@ commands.allow = ["batch_compose_images"]
 
 [default]
 description = "Default permissions for Imagen."
-permissions = ["allow-generate-image", "allow-load-settings", "allow-settings-exists", "allow-save-settings", "allow-save-generated-image", "allow-pick-random-reference-image", "allow-read-image-data-url", "allow-open-api-signup-url", "allow-open-qq-group-url", "allow-batch-convert-images", "allow-batch-compose-images"]
+permissions = ["allow-generate-image", "allow-cancel-generation", "allow-load-settings", "allow-settings-exists", "allow-save-settings", "allow-save-generated-image", "allow-pick-random-reference-image", "allow-read-image-data-url", "allow-open-api-signup-url", "allow-open-qq-group-url", "allow-batch-convert-images", "allow-batch-compose-images"]

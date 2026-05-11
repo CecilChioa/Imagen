@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 pub struct ApiProfile {
     pub id: String,
     pub name: String,
+    #[serde(default = "default_api_provider")]
+    pub provider: String,
+    #[serde(default = "default_api_version")]
+    pub api_version: String,
     pub api_key: String,
     pub api_base_url: String,
     pub model: String,
@@ -17,6 +21,8 @@ impl Default for ApiProfile {
         Self {
             id: "default".into(),
             name: "默认 API".into(),
+            provider: default_api_provider(),
+            api_version: default_api_version(),
             api_key: String::new(),
             api_base_url: "https://api.openai.com/v1".into(),
             model: "gpt-image-2".into(),
@@ -29,6 +35,8 @@ impl Default for ApiProfile {
 pub struct Settings {
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
+    #[serde(default = "default_language")]
+    pub language: String,
     #[serde(default = "default_api_profiles")]
     pub api_profiles: Vec<ApiProfile>,
     #[serde(default = "default_active_api_profile_id")]
@@ -41,6 +49,14 @@ pub struct Settings {
     pub quality: String,
     #[serde(default = "default_output_format")]
     pub output_format: String,
+    #[serde(default = "default_timeout_sec")]
+    pub timeout_sec: u32,
+    #[serde(default = "default_output_compression")]
+    pub output_compression: u8,
+    #[serde(default = "default_moderation")]
+    pub moderation: String,
+    #[serde(default = "default_background")]
+    pub background: String,
     #[serde(default)]
     pub remove_background: bool,
     #[serde(default = "default_count")]
@@ -114,12 +130,17 @@ impl Default for Settings {
         let profile = ApiProfile::default();
         Self {
             schema_version: default_schema_version(),
+            language: default_language(),
             api_profiles: vec![profile.clone()],
             active_api_profile_id: profile.id,
             output_dir: "outputs".into(),
             size: "1024x1024".into(),
             quality: "medium".into(),
             output_format: "png".into(),
+            timeout_sec: default_timeout_sec(),
+            output_compression: default_output_compression(),
+            moderation: default_moderation(),
+            background: default_background(),
             remove_background: false,
             n: 1,
             positive_prompt: String::new(),
@@ -179,7 +200,7 @@ pub struct GenerationResult {
 }
 
 pub fn load_settings_file() -> Result<Settings, String> {
-    let path = settings_path()?;
+    let path = readable_settings_path()?;
     if !path.exists() {
         return Ok(Settings::default());
     }
@@ -193,7 +214,7 @@ pub fn load_settings_file() -> Result<Settings, String> {
 }
 
 pub fn settings_file_exists() -> Result<bool, String> {
-    Ok(settings_path()?.exists())
+    Ok(readable_settings_path()?.exists())
 }
 
 pub fn save_settings_file(settings: &Settings) -> Result<(), String> {
@@ -205,13 +226,41 @@ pub fn save_settings_file(settings: &Settings) -> Result<(), String> {
     fs::write(path, text).map_err(|e| e.to_string())
 }
 
+fn readable_settings_path() -> Result<PathBuf, String> {
+    let path = settings_path()?;
+    if path.exists() {
+        return Ok(path);
+    }
+
+    Ok(legacy_settings_path())
+}
+
 fn settings_path() -> Result<PathBuf, String> {
-    let base = dirs::home_dir().ok_or_else(|| "No config directory available".to_string())?;
-    Ok(base.join(".imagen").join("settings.json"))
+    let base = dirs::config_dir().ok_or_else(|| "No config directory available".to_string())?;
+    Ok(base.join("com.imagen.app").join("settings.json"))
+}
+
+fn legacy_settings_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".imagen")
+        .join("settings.json")
 }
 
 fn default_api_profiles() -> Vec<ApiProfile> {
     vec![ApiProfile::default()]
+}
+
+fn default_api_provider() -> String {
+    "openai_compatible".into()
+}
+
+fn default_api_version() -> String {
+    "v1".into()
+}
+
+fn default_language() -> String {
+    "zh-CN".into()
 }
 
 fn default_schema_version() -> u32 {
@@ -236,6 +285,22 @@ fn default_quality() -> String {
 
 fn default_output_format() -> String {
     "png".into()
+}
+
+fn default_timeout_sec() -> u32 {
+    300
+}
+
+fn default_output_compression() -> u8 {
+    100
+}
+
+fn default_moderation() -> String {
+    "auto".into()
+}
+
+fn default_background() -> String {
+    "auto".into()
 }
 
 fn default_count() -> u32 {
@@ -307,6 +372,8 @@ fn migrate_legacy_settings(value: serde_json::Value) -> Result<Settings, String>
     let profile = ApiProfile {
         id: "default".into(),
         name: "默认 API".into(),
+        provider: default_api_provider(),
+        api_version: default_api_version(),
         api_key: value
             .get("apiKey")
             .and_then(|v| v.as_str())
@@ -326,6 +393,11 @@ fn migrate_legacy_settings(value: serde_json::Value) -> Result<Settings, String>
 
     Ok(Settings {
         schema_version: default_schema_version(),
+        language: value
+            .get("language")
+            .and_then(|v| v.as_str())
+            .unwrap_or("zh-CN")
+            .to_string(),
         api_profiles: vec![profile.clone()],
         active_api_profile_id: profile.id,
         output_dir: value
@@ -347,6 +419,26 @@ fn migrate_legacy_settings(value: serde_json::Value) -> Result<Settings, String>
             .get("outputFormat")
             .and_then(|v| v.as_str())
             .unwrap_or(&defaults.output_format)
+            .to_string(),
+        timeout_sec: value
+            .get("timeoutSec")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(defaults.timeout_sec),
+        output_compression: value
+            .get("outputCompression")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u8)
+            .unwrap_or(defaults.output_compression),
+        moderation: value
+            .get("moderation")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&defaults.moderation)
+            .to_string(),
+        background: value
+            .get("background")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&defaults.background)
             .to_string(),
         remove_background: value
             .get("removeBackground")

@@ -15,6 +15,7 @@ type ReturnValue = {
 
 export function useGeneration(params: GenerationParams): ReturnValue {
   const generationRunIdRef = useRef(0);
+  const activeCancellationIdRef = useRef<string | null>(null);
 
   const composePositivePrompt = (base: Settings, extraPrompt = "") => {
     const contentPrompt = contentTypes.find((item) => item.id === base.contentType)?.prompt ?? "";
@@ -40,6 +41,7 @@ export function useGeneration(params: GenerationParams): ReturnValue {
   const { onGenerate } = useSingleGeneration({
     params,
     generationRunIdRef,
+    activeCancellationIdRef,
     composePositivePrompt,
     pickReferenceFromLibrary,
     saveHistoryResult,
@@ -48,6 +50,7 @@ export function useGeneration(params: GenerationParams): ReturnValue {
   const { onBatchGenerate } = useBatchGeneration({
     params,
     generationRunIdRef,
+    activeCancellationIdRef,
     composePositivePrompt,
   });
 

@@ -20,6 +20,7 @@ import type {
   GenerationResult,
   SaveButtonState,
   Settings,
+  StatusMessage,
   ViewMode,
   BlpEncoding,
 } from "./types/app";
@@ -57,11 +58,12 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [draftSettings, setDraftSettings] = useState<Settings>(defaultSettings);
   const [editingProfileId, setEditingProfileId] = useState(defaultApiProfile.id);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<StatusMessage | null>(null);
 
   const [generateLogs, setGenerateLogs] = useState<string[]>([]);
   const [convertLogs, setConvertLogs] = useState<string[]>([]);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [previewList, setPreviewList] = useState<string[]>([]);
   const [history, setHistory] = useState<GenerationResult[]>([]);
 
   const [generationBusy, setGenerationBusy] = useState(false);
@@ -141,7 +143,7 @@ export default function App() {
     [draftSettings, editingProfileId],
   );
 
-  const { persistSettings, persistSettingsDebounced } = useSettingsPersistenceEffects({
+  const { persistSettings } = useSettingsPersistenceEffects({
     settings,
     saveNotice,
     status,
@@ -215,10 +217,13 @@ export default function App() {
     const selected = await chooseImageFile(t("single.referenceImage"));
 
     if (typeof selected === "string") {
-      persistSettingsDebounced({
-        ...settings,
-        referenceImagePath: selected,
-      });
+      void persistSettings(
+        {
+          ...settings,
+          referenceImagePath: selected,
+        },
+        { debounceMs: 300 },
+      );
     }
   };
 
@@ -226,10 +231,13 @@ export default function App() {
     const selected = await chooseImageFile(t("single.maskImage"));
 
     if (typeof selected === "string") {
-      persistSettingsDebounced({
-        ...settings,
-        maskImagePath: selected,
-      });
+      void persistSettings(
+        {
+          ...settings,
+          maskImagePath: selected,
+        },
+        { debounceMs: 300 },
+      );
     }
   };
 
@@ -237,10 +245,13 @@ export default function App() {
     const dir = await chooseDirectory(t("single.referenceLibrary"));
     if (!dir) return;
 
-    persistSettingsDebounced({
-      ...settings,
-      referenceLibraryDir: dir,
-    });
+    void persistSettings(
+      {
+        ...settings,
+        referenceLibraryDir: dir,
+      },
+      { debounceMs: 300 },
+    );
   };
 
   const { onGenerate, onBatchGenerate, pickReferenceFromLibrary } = useGeneration({
@@ -259,6 +270,7 @@ export default function App() {
     setSettings,
     setBatchItems,
     setPreviewSrc,
+    setPreviewList,
     setSaveButtonState,
     setHistory,
     persistSettings,
@@ -307,36 +319,42 @@ export default function App() {
       setSaveButtonState("saved");
       setSaveNotice(path);
       setGenerateLogs((current) => appendBoundedLogs(current, path, GENERATE_LOG_LIMIT));
-      setStatus("status.saveCompleted");
+      setStatus({ tone: "success", key: "status.saveCompleted" });
 
       window.setTimeout(() => {
         setSaveButtonState((state) => (state === "saved" ? "resave" : state));
       }, 900);
     } catch (error) {
       setSaveButtonState("resave");
-      setStatus(String(error));
+      setStatus({ tone: "warning", raw: String(error) });
     }
   };
 
   const applyStylePreset = (id: string) => {
-    setSettings({
-      ...settings,
-      stylePreset: id,
-    });
+    void persistSettings(
+      {
+        ...settings,
+        stylePreset: id,
+      },
+      { debounceMs: 300 },
+    );
   };
 
   const applyContentType = (id: string) => {
-    setSettings({
-      ...settings,
-      contentType: id,
-    });
+    void persistSettings(
+      {
+        ...settings,
+        contentType: id,
+      },
+      { debounceMs: 300 },
+    );
   };
 
   const onBatchConvert = async () => {
     if (convertBusy) return;
 
     if (!convertSourceDir.trim() || !convertTargetDir.trim() || convertSourceFormats.length === 0) {
-      setStatus("status.convertParamsRequired");
+      setStatus({ tone: "warning", key: "status.convertParamsRequired" });
       return;
     }
 
@@ -404,7 +422,7 @@ export default function App() {
       );
     } catch (error) {
       setConvertLogs((current) => appendBoundedLogs(current, `error:${String(error)}`, CONVERT_LOG_LIMIT));
-      setStatus(String(error));
+      setStatus({ tone: "warning", raw: String(error) });
     } finally {
       setConvertBusy(false);
     }
@@ -412,7 +430,7 @@ export default function App() {
   const onPickReferenceFromLibrary = async () => {
     const next = await pickReferenceFromLibrary(settings);
     await persistSettings(next);
-    setStatus("status.referencePicked");
+    setStatus({ tone: "success", key: "status.referencePicked" });
   };
 
   const onClearReferenceLibraryDir = async () => {
@@ -422,26 +440,32 @@ export default function App() {
   const onApplyHistory = (item: GenerationResult) => {
     const request = (item.request as Record<string, unknown>) ?? {};
 
-    setSettings((current) => ({
-      ...current,
-      positivePrompt:
-        typeof request.positive_prompt === "string"
-          ? stripPresetPrompts(request.positive_prompt)
-          : stripPresetPrompts(item.prompt),
-      negativePrompt:
-        typeof request.negative_prompt === "string"
-          ? request.negative_prompt
-          : "",
-    }));
+    void persistSettings(
+      {
+        ...settings,
+        positivePrompt:
+          typeof request.positive_prompt === "string"
+            ? stripPresetPrompts(request.positive_prompt)
+            : stripPresetPrompts(item.prompt),
+        negativePrompt:
+          typeof request.negative_prompt === "string"
+            ? request.negative_prompt
+            : "",
+      },
+      { debounceMs: 300 },
+    );
   };
 
   const onBatchItemApply = (item: BatchItem) => {
     setView("single");
-    setSettings((current) => ({
-      ...current,
-      positivePrompt: item.prompt,
-      negativePrompt: item.negativePrompt,
-    }));
+    void persistSettings(
+      {
+        ...settings,
+        positivePrompt: item.prompt,
+        negativePrompt: item.negativePrompt,
+      },
+      { debounceMs: 300 },
+    );
   };
 
   const onChooseConvertSourceDir = async () => {
@@ -468,12 +492,14 @@ export default function App() {
 
   const singlePageProps = {
     settings,
+    activeProfile,
     stylePresets,
     contentTypes,
     referencePreviewSrc,
     maskPreviewSrc,
     history,
     previewSrc,
+    previewList,
     generationBusy,
     saveButtonState,
     saveSize,
@@ -481,7 +507,9 @@ export default function App() {
     customHeight,
     logs: generateLogs,
     elapsedSeconds,
-    onSettingsChange: persistSettingsDebounced,
+    onSettingsChange: (next: Settings) => {
+      void persistSettings(next, { debounceMs: 300 });
+    },
     onApplyContentType: applyContentType,
     onApplyStylePreset: applyStylePreset,
     onChooseReferenceLibraryDir,
@@ -495,6 +523,7 @@ export default function App() {
     onApplyHistory,
     onGenerate,
     onSavePreview,
+    onPreviewSelect: setPreviewSrc,
     onSaveSizeChange: setSaveSize,
     onCustomWidthChange: setCustomWidth,
     onCustomHeightChange: setCustomHeight,

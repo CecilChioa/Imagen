@@ -313,6 +313,18 @@ label {
   gap: 10px;
 }
 
+.generation-params-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.generation-params-grid .mantine-Input-input,
+.generation-params-grid .mantine-Select-input {
+  height: 38px;
+  min-height: 38px;
+}
+
 .style-library-card .section-subtitle {
   font-size: 12px;
   line-height: 1.45;
@@ -619,6 +631,34 @@ label {
   object-fit: contain;
   object-position: center;
   border-radius: 8px;
+}
+
+.preview-strip {
+  display: grid;
+  width: min(100%, 620px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preview-strip-item {
+  border: 1px solid rgba(90, 98, 124, 0.55);
+  border-radius: 8px;
+  background: #13151d;
+  padding: 0;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+}
+
+.preview-strip-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-strip-item.active {
+  border-color: #6868ff;
+  box-shadow: inset 0 0 0 1px rgba(104, 104, 255, 0.45);
 }
 
 .preview-zoom-modal {
@@ -1867,13 +1907,14 @@ label {
 }
 
 .settings-api-grid .settings-card {
-  height: var(--settings-api-card-height);
   min-height: var(--settings-api-card-height);
-  max-height: var(--settings-api-card-height);
   overflow: hidden;
 }
 
 .settings-api-list-card {
+  height: var(--settings-api-card-height);
+  min-height: var(--settings-api-card-height);
+  max-height: var(--settings-api-card-height);
   overflow: hidden;
 }
 
@@ -1883,13 +1924,42 @@ label {
   overflow: hidden;
 }
 
+.settings-api-header {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-api-title {
+  margin: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.settings-api-actions {
+  flex: 0 0 auto;
+}
+
+.settings-api-action-button.mantine-Button-root {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .settings-current-card {
-  padding: 22px 24px 26px !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px 24px 18px !important;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .settings-current-form {
-  height: 100%;
-  gap: 9px !important;
+  width: 100%;
+  margin: auto 0;
+  gap: 8px !important;
 }
 
 .settings-current-form .mantine-Title-root {
@@ -1902,13 +1972,13 @@ label {
 }
 
 .settings-current-field .mantine-InputWrapper-label {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .settings-current-field .mantine-Input-input {
   width: 100%;
-  height: 44px;
-  min-height: 44px;
+  height: 40px;
+  min-height: 40px;
 }
 
 .settings-delete-api-button.mantine-Button-root {
@@ -1961,7 +2031,7 @@ label {
 
 .settings-modal-body {
   overflow: hidden;
-  padding-top: 8px;
+  padding-top: 2px;
 }
 
 .settings-card,

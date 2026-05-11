@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import i18n from "../i18n";
 import { chooseDirectory } from "../lib/filePickers";
 import { invokeCommand } from "../lib/tauri";
-import type { ApiProfile, Settings } from "../types/app";
+import type { ApiProfile, Settings, StatusMessage } from "../types/app";
 
 type Params = {
   settings: Settings;
@@ -17,7 +17,7 @@ type Params = {
   setEditingProfileId: (id: string) => void;
   setSettingsOpen: (open: boolean) => void;
   setLocalModelOpen: (open: boolean) => void;
-  setStatus: (value: string) => void;
+  setStatus: (value: StatusMessage | null) => void;
   persistSettings: (next: Settings) => Promise<void>;
 };
 
@@ -38,12 +38,15 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
   const savePromptToLibrary = async (kind: "positive" | "negative") => {
     const prompt = (kind === "positive" ? params.settings.positivePrompt : params.settings.negativePrompt).trim();
     if (!prompt) {
-      params.setStatus(`status.${kind === "positive" ? "promptEmptyPositive" : "promptEmptyNegative"}`);
+      params.setStatus({
+        tone: "warning",
+        key: `status.${kind === "positive" ? "promptEmptyPositive" : "promptEmptyNegative"}`,
+      });
       return;
     }
     const key = kind === "positive" ? "positivePromptLibrary" : "negativePromptLibrary";
     if (params.settings[key].includes(prompt)) {
-      params.setStatus("status.promptAlreadyExists");
+      params.setStatus({ tone: "warning", key: "status.promptAlreadyExists" });
       return;
     }
     await params.persistSettings({ ...params.settings, [key]: [prompt, ...params.settings[key]] });
@@ -105,14 +108,14 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     await params.persistSettings(next);
     params.setEditingProfileId(next.activeApiProfileId);
     params.setSettingsOpen(false);
-    params.setStatus("status.settingsSaved");
+    params.setStatus({ tone: "success", key: "status.settingsSaved" });
   };
 
   const onOpenApiSignup = async (provider: "pptokens" | "aifast" | "yunwu") => {
     try {
       await invokeCommand("open_api_signup_url", { provider });
     } catch (error) {
-      params.setStatus(String(error));
+      params.setStatus({ tone: "warning", raw: String(error) });
     }
   };
 
@@ -121,6 +124,8 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     const next = {
       ...profile,
       name: params.localModelName.trim() || i18n.t("settings.localModelDefaultName"),
+      provider: "openai_compatible" as const,
+      apiVersion: "v1",
       apiBaseUrl: params.localModelBaseUrl.trim() || "http://127.0.0.1:11434/v1",
       model: params.localModelId.trim() || "llava",
       apiKey: "",
@@ -132,7 +137,7 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     }));
     params.setEditingProfileId(next.id);
     params.setLocalModelOpen(false);
-    params.setStatus("status.localModelConnected");
+    params.setStatus({ tone: "success", key: "status.localModelConnected" });
   };
 
   return {

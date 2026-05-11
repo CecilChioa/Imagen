@@ -13,7 +13,7 @@ import {
   Title,
 } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import type { ApiProfile, Settings } from "../types/app";
+import type { ApiProfile, ApiProvider, Settings } from "../types/app";
 
 type Props = {
   open: boolean;
@@ -87,9 +87,19 @@ export function SettingsModal(props: Props) {
           <SimpleGrid className="settings-api-grid" cols={{ base: 1, sm: 2 }} spacing="lg">
             <Card className="settings-card settings-api-list-card" withBorder>
               <Stack className="settings-api-list-stack" gap="sm">
-                <Group justify="space-between" align="center">
-                  <Title order={3}>{t("settings.apiConfig")}</Title>
-                  <Button variant="light" onClick={props.onAddProfile}>{t("settings.addApi")}</Button>
+                <Group className="settings-api-header" justify="space-between" align="center" wrap="nowrap">
+                  <Title className="settings-api-title" order={3}>{t("settings.apiConfig")}</Title>
+                  <Group className="settings-api-actions" gap="xs" wrap="nowrap">
+                    <Button
+                      className="settings-api-action-button"
+                      variant="light"
+                      disabled={props.draftSettings.apiProfiles.length <= 1 || !props.editingProfile}
+                      onClick={() => props.editingProfile && props.onDeleteProfile(props.editingProfile.id)}
+                    >
+                      {t("settings.deleteCurrentApi")}
+                    </Button>
+                    <Button className="settings-api-action-button" variant="light" onClick={props.onAddProfile}>{t("settings.addApi")}</Button>
+                  </Group>
                 </Group>
                 <div className="settings-profile-scroll">
                   <Stack gap="xs">
@@ -129,21 +139,30 @@ export function SettingsModal(props: Props) {
                   value={props.editingProfile?.apiBaseUrl ?? ""}
                   onChange={(e) => props.onUpdateEditingProfile({ apiBaseUrl: e.target.value })}
                 />
+                <Select
+                  className="settings-current-field"
+                  label={t("settings.provider")}
+                  value={props.editingProfile?.provider ?? "openai_compatible"}
+                  data={[
+                    { value: "openai_compatible", label: `${t("settings.providerOpenAiCompatible")} (v1)` },
+                    { value: "gemini_native", label: `${t("settings.providerGeminiNative")} (v1beta)` },
+                  ]}
+                  onChange={(value) => {
+                    if (!value) return;
+                    const provider = value as ApiProvider;
+                    props.onUpdateEditingProfile({
+                      provider,
+                      apiVersion: provider === "gemini_native" ? "v1beta" : "v1",
+                    });
+                  }}
+                  allowDeselect={false}
+                />
                 <TextInput
                   className="settings-current-field settings-current-model-field"
                   label={t("settings.modelName")}
                   value={props.editingProfile?.model ?? ""}
                   onChange={(e) => props.onUpdateEditingProfile({ model: e.target.value })}
                 />
-                <Button
-                  className="settings-delete-api-button"
-                  color="red"
-                  variant="light"
-                  disabled={props.draftSettings.apiProfiles.length <= 1 || !props.editingProfile}
-                  onClick={() => props.editingProfile && props.onDeleteProfile(props.editingProfile.id)}
-                >
-                  {t("settings.deleteCurrentApi")}
-                </Button>
               </Stack>
             </Card>
           </SimpleGrid>

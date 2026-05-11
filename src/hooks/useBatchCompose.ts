@@ -3,12 +3,12 @@ import { appendBoundedLogs, CONVERT_LOG_LIMIT, resetBoundedLogs } from "../confi
 import i18n from "../i18n";
 import { chooseDirectory, chooseImageFile, COMPOSE_IMAGE_EXTENSIONS } from "../lib/filePickers";
 import { invokeCommand } from "../lib/tauri";
-import type { BatchComposeResult, Settings } from "../types/app";
+import type { BatchComposeResult, Settings, StatusMessage } from "../types/app";
 
 type Params = {
   settings: Settings;
   persistSettings: (next: Settings) => Promise<void>;
-  setStatus: (value: string) => void;
+  setStatus: (value: StatusMessage | null) => void;
 };
 
 const formatLog = (value: unknown) => JSON.stringify(value, null, 2);
@@ -74,7 +74,7 @@ export function useBatchCompose(params: Params) {
   const onBatchCompose = async () => {
     if (composeBusy) return;
     if (!composeBaseDir.trim() || !composeTargetDir.trim() || (!composeLowerOverlayPath.trim() && !composeUpperOverlayPath.trim())) {
-      setStatus("status.composeParamsRequired");
+      setStatus({ tone: "warning", key: "status.composeParamsRequired" });
       return;
     }
 
@@ -115,10 +115,10 @@ export function useBatchCompose(params: Params) {
           CONVERT_LOG_LIMIT,
         ),
       );
-      setStatus("status.composeCompleted");
+      setStatus({ tone: "success", key: "status.composeCompleted" });
     } catch (error) {
       setComposeLogs((current) => appendBoundedLogs(current, `compose:error ${String(error)}`, CONVERT_LOG_LIMIT));
-      setStatus(String(error));
+      setStatus({ tone: "warning", raw: String(error) });
     } finally {
       setComposeBusy(false);
     }

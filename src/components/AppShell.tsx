@@ -24,6 +24,7 @@ import type {
   PresetOption,
   SaveButtonState,
   Settings,
+  StatusMessage,
   TgaBits,
   ViewMode,
 } from "../types/app";
@@ -32,7 +33,7 @@ type ShellBaseProps = {
   view: ViewMode;
   setView: (view: ViewMode) => void;
   saveNotice: string;
-  status: string;
+  status: StatusMessage | null;
 };
 
 type SettingsStateProps = {
@@ -62,12 +63,14 @@ type SettingsStateProps = {
 };
 
 type SingleViewProps = {
+  activeProfile?: ApiProfile;
   stylePresets: PresetOption[];
   contentTypes: PresetOption[];
   referencePreviewSrc: string;
   maskPreviewSrc: string;
   history: GenerationResult[];
   previewSrc: string | null;
+  previewList: string[];
   generationBusy: boolean;
   saveButtonState: SaveButtonState;
   saveSize: string;
@@ -89,6 +92,7 @@ type SingleViewProps = {
   onApplyHistory: (item: GenerationResult) => void;
   onGenerate: () => Promise<void>;
   onSavePreview: () => Promise<void>;
+  onPreviewSelect: (value: string) => void;
   onSaveSizeChange: (value: string) => void;
   onCustomWidthChange: (value: number) => void;
   onCustomHeightChange: (value: number) => void;
@@ -182,22 +186,29 @@ type AppShellProps = ShellBaseProps &
 
 export function AppShell(props: AppShellProps) {
   const { t } = useTranslation();
-  const translateStatus = (value: string) => (value.startsWith("status.") ? t(value) : value);
+  const translateStatus = (value: StatusMessage | null) => {
+    if (!value) return "";
+    if (value.key) return t(value.key, value.values);
+    return value.raw ?? "";
+  };
   const batchStatusLabel = (statusCode?: BatchItem["statusCode"], fallback = "") => {
     if (statusCode === "pending") return t("batch.pending");
     if (statusCode === "running") return t("batch.running");
     if (statusCode === "done") return t("batch.done");
     if (statusCode === "failed") return t("batch.failed");
+    if (statusCode === "cancelled") return t("batch.cancelled");
     return fallback;
   };
   const singlePageProps = {
     settings: props.settings,
+    activeProfile: props.activeProfile,
     stylePresets: props.stylePresets,
     contentTypes: props.contentTypes,
     referencePreviewSrc: props.referencePreviewSrc,
     maskPreviewSrc: props.maskPreviewSrc,
     history: props.history,
     previewSrc: props.previewSrc,
+    previewList: props.previewList,
     generationBusy: props.generationBusy,
     saveButtonState: props.saveButtonState,
     saveSize: props.saveSize,
@@ -219,6 +230,7 @@ export function AppShell(props: AppShellProps) {
     onApplyHistory: props.onApplyHistory,
     onGenerate: props.onGenerate,
     onSavePreview: props.onSavePreview,
+    onPreviewSelect: props.onPreviewSelect,
     onSaveSizeChange: props.onSaveSizeChange,
     onCustomWidthChange: props.onCustomWidthChange,
     onCustomHeightChange: props.onCustomHeightChange,
@@ -335,18 +347,7 @@ export function AppShell(props: AppShellProps) {
     onConnectLocalModel: props.onConnectLocalModel,
   };
 
-  const statusTone = useMemo(() => {
-    if (!props.status) return "info";
-    if (props.status.startsWith("status.")) {
-      if (["status.generationStopped", "status.batchGenerationStopped"].includes(props.status)) return "warning";
-      if (["status.generationCompleted", "status.batchGenerationCompleted", "status.composeCompleted", "status.saveCompleted", "status.settingsSaved", "status.localModelConnected", "status.referencePicked"].includes(props.status)) return "success";
-      return "info";
-    }
-    if (/failed|error|stop/i.test(props.status)) return "warning";
-    if (/saved|completed|success/i.test(props.status)) return "success";
-    if (/loading|saving|running|processing/i.test(props.status)) return "loading";
-    return "info";
-  }, [props.status]);
+  const statusTone = useMemo(() => props.status?.tone ?? "info", [props.status]);
 
   const [statusToastVisible, setStatusToastVisible] = useState(Boolean(props.status));
 

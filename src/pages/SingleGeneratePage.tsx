@@ -2,19 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Modal, NumberInput, Select, TextInput, Textarea } from "@mantine/core";
 import { HISTORY_LIMIT } from "../config/generation";
-import type { PresetOption, SaveButtonState, Settings, GenerationResult } from "../types/app";
+import type { ApiProfile, PresetOption, SaveButtonState, Settings, GenerationResult } from "../types/app";
 
 type HistoryItem = GenerationResult;
 type OptionItem = PresetOption;
 
 type Props = {
   settings: Settings;
+  activeProfile?: ApiProfile;
   stylePresets: OptionItem[];
   contentTypes: OptionItem[];
   referencePreviewSrc: string;
   maskPreviewSrc: string;
   history: HistoryItem[];
   previewSrc: string | null;
+  previewList: string[];
   generationBusy: boolean;
   saveButtonState: SaveButtonState;
   saveSize: string;
@@ -36,6 +38,7 @@ type Props = {
   onApplyHistory: (item: HistoryItem) => void;
   onGenerate: () => Promise<void>;
   onSavePreview: () => Promise<void>;
+  onPreviewSelect: (value: string) => void;
   onSaveSizeChange: (value: string) => void;
   onCustomWidthChange: (value: number) => void;
   onCustomHeightChange: (value: number) => void;
@@ -45,12 +48,14 @@ export function SingleGeneratePage(props: Props) {
   const { t } = useTranslation();
   const {
     settings,
+    activeProfile,
     stylePresets,
     contentTypes,
     referencePreviewSrc,
     maskPreviewSrc,
     history,
     previewSrc,
+    previewList,
     generationBusy,
     saveButtonState,
     saveSize,
@@ -60,6 +65,7 @@ export function SingleGeneratePage(props: Props) {
     elapsedSeconds,
   } = props;
   const [previewZoomOpen, setPreviewZoomOpen] = useState(false);
+  const isGemini = activeProfile?.provider === "gemini_native";
   const [previewZoomFullscreen, setPreviewZoomFullscreen] = useState(false);
   const [previewZoomScale, setPreviewZoomScale] = useState(1);
   const [previewImageSize, setPreviewImageSize] = useState({ width: 0, height: 0 });
@@ -102,6 +108,7 @@ export function SingleGeneratePage(props: Props) {
   const zoomedPreviewWidth = previewImageSize.width > 0 ? Math.round(previewImageSize.width * previewZoomScale) : 0;
   const zoomedPreviewHeight = previewImageSize.height > 0 ? Math.round(previewImageSize.height * previewZoomScale) : 0;
   const logsText = useMemo(() => logs.join("\n"), [logs]);
+  const multiPreviewItems = useMemo(() => previewList.slice(0, 4), [previewList]);
 
   return (
     <>
@@ -205,6 +212,98 @@ export function SingleGeneratePage(props: Props) {
                 onChange={(e) => props.onSettingsChange({ ...settings, negativePrompt: e.target.value })}
               />
             </div>
+            <div className="generation-params-grid">
+              <Select
+                label={t("single.size")}
+                value={settings.size}
+                data={[
+                  { value: "1024x1024", label: "1024x1024" },
+                  { value: "1536x1024", label: "1536x1024" },
+                  { value: "1024x1536", label: "1024x1536" },
+                  { value: "auto", label: "auto" },
+                ]}
+                onChange={(value) => value && props.onSettingsChange({ ...settings, size: value })}
+                allowDeselect={false}
+              />
+              <Select
+                label={t("single.quality")}
+                value={settings.quality}
+                data={[
+                  { value: "auto", label: "auto" },
+                  { value: "low", label: "low" },
+                  { value: "medium", label: "medium" },
+                  { value: "high", label: "high" },
+                ]}
+                onChange={(value) => value && props.onSettingsChange({ ...settings, quality: value })}
+                allowDeselect={false}
+              />
+              <Select
+                label={t("single.outputFormat")}
+                value={settings.outputFormat}
+                data={isGemini
+                  ? [
+                      { value: "png", label: "png" },
+                      { value: "jpeg", label: "jpeg" },
+                      { value: "webp", label: "webp" },
+                    ]
+                  : [
+                      { value: "png", label: "png" },
+                      { value: "jpeg", label: "jpeg" },
+                      { value: "webp", label: "webp" },
+                    ]}
+                onChange={(value) => value && props.onSettingsChange({ ...settings, outputFormat: value })}
+                allowDeselect={false}
+              />
+              {!isGemini && (
+                <NumberInput
+                  label={t("single.outputCompression")}
+                  value={settings.outputCompression}
+                  min={0}
+                  max={100}
+                  allowDecimal={false}
+                  onChange={(value) => props.onSettingsChange({ ...settings, outputCompression: Math.max(0, Math.min(100, Number(value) || 0)) })}
+                />
+              )}
+              <Select
+                label={t("single.moderation")}
+                value={settings.moderation}
+                data={[
+                  { value: "auto", label: "auto" },
+                  { value: "low", label: "low" },
+                ]}
+                onChange={(value) => value && props.onSettingsChange({ ...settings, moderation: value as Settings["moderation"] })}
+                allowDeselect={false}
+              />
+              {!isGemini && (
+                <Select
+                  label={t("single.background")}
+                  value={settings.background}
+                  data={[
+                    { value: "auto", label: t("single.backgroundAuto") },
+                    { value: "transparent", label: t("single.backgroundTransparent") },
+                    { value: "opaque", label: t("single.backgroundOpaque") },
+                  ]}
+                  onChange={(value) => value && props.onSettingsChange({ ...settings, background: value as Settings["background"] })}
+                  allowDeselect={false}
+                />
+              )}
+              <NumberInput
+                label={t("single.timeoutSec")}
+                value={settings.timeoutSec}
+                min={10}
+                max={1200}
+                allowDecimal={false}
+                onChange={(value) => props.onSettingsChange({ ...settings, timeoutSec: Math.max(10, Number(value) || 10) })}
+              />
+              <NumberInput
+                label={t("single.imageCount")}
+                value={settings.n}
+                min={1}
+                max={4}
+                allowDecimal={false}
+                onChange={(value) => props.onSettingsChange({ ...settings, n: Math.max(1, Math.min(4, Number(value) || 1)) })}
+              />
+            </div>
           </section>
         </aside>
 
@@ -225,10 +324,25 @@ export function SingleGeneratePage(props: Props) {
               </span>
             ) : <span>{t("single.previewPlaceholder")}</span>}
           </button>
+          {multiPreviewItems.length > 1 && (
+            <div className="preview-strip" role="list" aria-label={t("single.previewList")}>
+              {multiPreviewItems.map((item, index) => (
+                <button
+                  key={`${item.slice(0, 48)}-${index}`}
+                  type="button"
+                  className={item === previewSrc ? "preview-strip-item active" : "preview-strip-item"}
+                  onClick={() => props.onPreviewSelect(item)}
+                  title={`${t("single.previewAlt")} #${index + 1}`}
+                >
+                  <img src={item} alt={`${t("single.previewAlt")} #${index + 1}`} />
+                </button>
+              ))}
+            </div>
+          )}
           <div className="operation-row">
             <div className="bottom-actions">
               <Button className={generationBusy ? "stop-action" : "primary-action"} onClick={props.onGenerate}>
-                {generationBusy ? t("single.stopGenerate") : previewSrc ? t("single.regenerate") : t("single.generate")}
+                {generationBusy ? t("single.stopGenerate") : t("single.generate")}
               </Button>
               <Button className={saveButtonState === "saved" ? "save-action saved" : "save-action"} disabled={!previewSrc || saveButtonState === "saving"} onClick={props.onSavePreview}>
                 {saveButtonState === "saving" ? t("single.saving") : saveButtonState === "saved" ? t("single.saveSuccess") : saveButtonState === "resave" ? t("single.saveAgain") : t("single.saveImage")}
