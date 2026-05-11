@@ -1,6 +1,7 @@
 import { Button, NumberInput, Select, Textarea } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { parseBatchPromptLines } from "../config/generation";
+import { clampBatchConcurrency } from "../config/settings";
 import type { BatchItem, BatchMode } from "../types/app";
 type Props = {
   generationBusy: boolean;
@@ -78,7 +79,7 @@ export function BatchGeneratePage(props: Props) {
               max={20}
               value={props.batchConcurrency}
               allowDecimal={false}
-              onChange={(value) => props.onBatchConcurrencyChange(Number(value) || 1)}
+              onChange={(value) => props.onBatchConcurrencyChange(clampBatchConcurrency(value))}
             />
           )}
           <Select

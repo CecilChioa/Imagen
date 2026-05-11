@@ -1,4 +1,5 @@
 import { appendBoundedLogs, GENERATE_LOG_LIMIT, resetBoundedLogs } from "../config/generation";
+import { clampImageCount } from "../config/settings";
 import i18n from "../i18n";
 import { invokeCommand, isCancelledError } from "../lib/tauri";
 import type { GenerationResult } from "../types/app";
@@ -59,7 +60,7 @@ export const useSingleGeneration = ({
         ...nextSettings,
         positivePrompt: composePositivePrompt(nextSettings),
       };
-      const targetCount = Math.max(1, Math.min(4, Number(nextSettings.n) || 1));
+      const targetCount = clampImageCount(nextSettings.n);
       if (nextSettings.referenceImagePath !== params.settings.referenceImagePath) {
         params.setSettings(nextSettings);
       }

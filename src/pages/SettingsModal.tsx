@@ -13,7 +13,12 @@ import {
   Title,
 } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import type { ApiProfile, ApiProvider, Settings } from "../types/app";
+import {
+  apiSignupProviders,
+  apiVersionByProvider,
+  providerOptionKeys,
+} from "../config/settings";
+import type { ApiProfile, ApiProvider, ApiSignupProvider, Settings } from "../types/app";
 
 type Props = {
   open: boolean;
@@ -39,7 +44,7 @@ type Props = {
   onSetReleaseNotesOpen: (open: boolean) => void;
   onSetAboutOpen: (open: boolean) => void;
   onSetLocalModelOpen: (open: boolean) => void;
-  onOpenApiSignup: (provider: "pptokens" | "aifast" | "yunwu") => Promise<void>;
+  onOpenApiSignup: (provider: ApiSignupProvider) => Promise<void>;
   onLocalModelNameChange: (value: string) => void;
   onLocalModelBaseUrlChange: (value: string) => void;
   onLocalModelIdChange: (value: string) => void;
@@ -55,23 +60,6 @@ const releaseNotes = [
 
 export function SettingsModal(props: Props) {
   const { t } = useTranslation();
-  const providerCards = [
-    {
-      id: "pptokens" as const,
-      name: "PPtokens",
-      url: "https://www.pptoken.org/?promo=AFFNV",
-    },
-    {
-      id: "aifast" as const,
-      name: "速擎智能",
-      url: "https://aifast.site/register?aff=6fbi",
-    },
-    {
-      id: "yunwu" as const,
-      name: "云雾",
-      url: "https://yunwu.ai/register?aff=3QLV",
-    },
-  ];
 
   return (
     <>
@@ -143,16 +131,16 @@ export function SettingsModal(props: Props) {
                   className="settings-current-field"
                   label={t("settings.provider")}
                   value={props.editingProfile?.provider ?? "openai_compatible"}
-                  data={[
-                    { value: "openai_compatible", label: `${t("settings.providerOpenAiCompatible")} (v1)` },
-                    { value: "gemini_native", label: `${t("settings.providerGeminiNative")} (v1beta)` },
-                  ]}
+                  data={providerOptionKeys.map((option) => ({
+                    value: option.value,
+                    label: `${t(option.labelKey)} (${apiVersionByProvider[option.value]})`,
+                  }))}
                   onChange={(value) => {
                     if (!value) return;
                     const provider = value as ApiProvider;
                     props.onUpdateEditingProfile({
                       provider,
-                      apiVersion: provider === "gemini_native" ? "v1beta" : "v1",
+                      apiVersion: apiVersionByProvider[provider],
                     });
                   }}
                   allowDeselect={false}
@@ -211,7 +199,7 @@ export function SettingsModal(props: Props) {
         centered
       >
         <Stack gap="sm">
-          {providerCards.map((provider) => (
+          {apiSignupProviders.map((provider) => (
             <Card
               key={provider.id}
               className="settings-action-card"

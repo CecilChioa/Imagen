@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Modal, NumberInput, Select, TextInput, Textarea } from "@mantine/core";
-import { HISTORY_LIMIT } from "../config/generation";
+import { Button, Modal, NumberInput, Select } from "@mantine/core";
+import {
+  buildGenerationParamControls,
+  type ParamControl,
+} from "./singleGenerateParamSchema";
+import { SingleGenerateImageToImageSection } from "./SingleGenerateImageToImageSection";
+import { SingleGeneratePromptField } from "./SingleGeneratePromptField";
+import { SingleGenerateReferenceLibrarySection } from "./SingleGenerateReferenceLibrarySection";
+import { SingleGenerateWorkspace } from "./SingleGenerateWorkspace";
 import type { ApiProfile, PresetOption, SaveButtonState, Settings, GenerationResult } from "../types/app";
 
 type HistoryItem = GenerationResult;
@@ -65,6 +72,7 @@ export function SingleGeneratePage(props: Props) {
     elapsedSeconds,
   } = props;
   const [previewZoomOpen, setPreviewZoomOpen] = useState(false);
+  const onSettingsChange = props.onSettingsChange;
   const isGemini = activeProfile?.provider === "gemini_native";
   const [previewZoomFullscreen, setPreviewZoomFullscreen] = useState(false);
   const [previewZoomScale, setPreviewZoomScale] = useState(1);
@@ -108,7 +116,15 @@ export function SingleGeneratePage(props: Props) {
   const zoomedPreviewWidth = previewImageSize.width > 0 ? Math.round(previewImageSize.width * previewZoomScale) : 0;
   const zoomedPreviewHeight = previewImageSize.height > 0 ? Math.round(previewImageSize.height * previewZoomScale) : 0;
   const logsText = useMemo(() => logs.join("\n"), [logs]);
-  const multiPreviewItems = useMemo(() => previewList.slice(0, 4), [previewList]);
+  const generationParamControls = useMemo<ParamControl[]>(
+    () => buildGenerationParamControls({
+      settings,
+      isGemini,
+      t,
+      onSettingsChange,
+    }),
+    [isGemini, onSettingsChange, settings, t],
+  );
 
   return (
     <>
@@ -129,277 +145,125 @@ export function SingleGeneratePage(props: Props) {
                   onChange={(value) => value && props.onApplyStylePreset(value)}
                 />
               </div>
-              <div className="path-picker path-picker-mantine">
-                <TextInput
-                  label={t("single.referenceLibrary")}
-                  value={settings.referenceLibraryDir || t("single.noReferenceLibrary")}
-                  readOnly
-                />
-                <Button type="button" className="ghost-button" onClick={props.onChooseReferenceLibraryDir}>{t("settings.chooseFolder")}</Button>
-              </div>
-              <div className="style-library-actions">
-                <Button type="button" className="ghost-button" disabled={!settings.referenceLibraryDir} onClick={props.onPickReferenceFromLibrary}>
-                  {t("single.randomReference")}
-                </Button>
-                <Button type="button" className="ghost-button" disabled={!settings.referenceLibraryDir} onClick={props.onClearReferenceLibraryDir}>
-                  {t("single.clearLibrary")}
-                </Button>
-              </div>
           </section>
 
-          <section className="panel-section image-to-image-section">
-            <div className="panel-subtitle">{t("single.imageToImage")}</div>
-            <div className="image-picker-grid">
-              <button className={settings.referenceImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.referenceImagePath ? props.onSettingsChange({ ...settings, referenceImagePath: "" }) : props.onChooseReferenceImage())}>
-                {referencePreviewSrc ? <img src={referencePreviewSrc} alt={t("single.referenceImageAlt")} /> : null}
-                <span>{t("single.referenceImage")}</span>
-                <small>{settings.referenceImagePath ? t("single.selectedClickClear") : t("single.clickToChoose")}</small>
-              </button>
-              <button className={settings.maskImagePath ? "thumb-box selected" : "thumb-box"} onClick={() => (settings.maskImagePath ? props.onSettingsChange({ ...settings, maskImagePath: "" }) : props.onChooseMaskImage())}>
-                {maskPreviewSrc ? <img src={maskPreviewSrc} alt={t("single.maskImageAlt")} /> : null}
-                <span>{t("single.maskImage")}</span>
-                <small>{settings.maskImagePath ? t("single.selectedClickClear") : t("single.clickToChoose")}</small>
-              </button>
-            </div>
-          </section>
+          <SingleGenerateReferenceLibrarySection
+            referenceLibraryDir={settings.referenceLibraryDir}
+            noReferenceLibraryLabel={t("single.noReferenceLibrary")}
+            referenceLibraryLabel={t("single.referenceLibrary")}
+            chooseFolderLabel={t("settings.chooseFolder")}
+            randomReferenceLabel={t("single.randomReference")}
+            clearLibraryLabel={t("single.clearLibrary")}
+            onChooseReferenceLibraryDir={props.onChooseReferenceLibraryDir}
+            onPickReferenceFromLibrary={props.onPickReferenceFromLibrary}
+            onClearReferenceLibraryDir={props.onClearReferenceLibraryDir}
+          />
+
+          <SingleGenerateImageToImageSection
+            referenceImagePath={settings.referenceImagePath}
+            maskImagePath={settings.maskImagePath}
+            referencePreviewSrc={referencePreviewSrc}
+            maskPreviewSrc={maskPreviewSrc}
+            title={t("single.imageToImage")}
+            referenceLabel={t("single.referenceImage")}
+            referenceAlt={t("single.referenceImageAlt")}
+            maskLabel={t("single.maskImage")}
+            maskAlt={t("single.maskImageAlt")}
+            selectedClickClearLabel={t("single.selectedClickClear")}
+            clickToChooseLabel={t("single.clickToChoose")}
+            onClearReferenceImage={() => onSettingsChange({ ...settings, referenceImagePath: "" })}
+            onClearMaskImage={() => onSettingsChange({ ...settings, maskImagePath: "" })}
+            onChooseReferenceImage={props.onChooseReferenceImage}
+            onChooseMaskImage={props.onChooseMaskImage}
+          />
 
           <section className="panel-section prompt-section">
-            <div className="prompt-field">
-              <div className="prompt-toolbar">
-                <span>{t("single.positivePrompt")}</span>
-                <div className="prompt-library-actions">
-                  <Select
-                    value={settings.positivePromptLibrary.includes(settings.positivePrompt) ? settings.positivePrompt : null}
-                    data={[
-                      { value: "", label: t("single.chooseHistoryPrompt") },
-                      ...settings.positivePromptLibrary.map((prompt: string) => ({ value: prompt, label: prompt.slice(0, 48) })),
-                    ]}
-                    onChange={(value) => props.onChoosePrompt("positive", value ?? "")}
-                    placeholder={t("single.chooseHistoryPrompt")}
-                  />
-                  <Button type="button" className="mini-button" onClick={() => props.onSavePrompt("positive")}>{t("single.savePrompt")}</Button>
-                  <Button type="button" className="mini-button danger-mini" disabled={!settings.positivePromptLibrary.includes(settings.positivePrompt)} onClick={() => props.onDeletePrompt("positive", settings.positivePrompt)}>{t("single.deletePrompt")}</Button>
-                </div>
-              </div>
-              <Textarea
-                minRows={7}
-                value={settings.positivePrompt}
-                placeholder={t("single.positivePlaceholder")}
-                onChange={(e) => props.onSettingsChange({ ...settings, positivePrompt: e.target.value })}
-              />
-            </div>
-            <div className="prompt-field">
-              <div className="prompt-toolbar">
-                <span>{t("single.negativePrompt")}</span>
-                <div className="prompt-library-actions">
-                  <Select
-                    value={settings.negativePromptLibrary.includes(settings.negativePrompt) ? settings.negativePrompt : null}
-                    data={[
-                      { value: "", label: t("single.chooseHistoryPrompt") },
-                      ...settings.negativePromptLibrary.map((prompt: string) => ({ value: prompt, label: prompt.slice(0, 48) })),
-                    ]}
-                    onChange={(value) => props.onChoosePrompt("negative", value ?? "")}
-                    placeholder={t("single.chooseHistoryPrompt")}
-                  />
-                  <Button type="button" className="mini-button" onClick={() => props.onSavePrompt("negative")}>{t("single.savePrompt")}</Button>
-                  <Button type="button" className="mini-button danger-mini" disabled={!settings.negativePromptLibrary.includes(settings.negativePrompt)} onClick={() => props.onDeletePrompt("negative", settings.negativePrompt)}>{t("single.deletePrompt")}</Button>
-                </div>
-              </div>
-              <Textarea
-                minRows={4}
-                value={settings.negativePrompt}
-                placeholder={t("single.negativePlaceholder")}
-                onChange={(e) => props.onSettingsChange({ ...settings, negativePrompt: e.target.value })}
-              />
-            </div>
+            <SingleGeneratePromptField
+              kind="positive"
+              title={t("single.positivePrompt")}
+              value={settings.positivePrompt}
+              placeholder={t("single.positivePlaceholder")}
+              minRows={7}
+              library={settings.positivePromptLibrary}
+              chooseHistoryLabel={t("single.chooseHistoryPrompt")}
+              saveLabel={t("single.savePrompt")}
+              deleteLabel={t("single.deletePrompt")}
+              onChange={(value) => onSettingsChange({ ...settings, positivePrompt: value })}
+              onChoosePrompt={props.onChoosePrompt}
+              onSavePrompt={props.onSavePrompt}
+              onDeletePrompt={props.onDeletePrompt}
+            />
+            <SingleGeneratePromptField
+              kind="negative"
+              title={t("single.negativePrompt")}
+              value={settings.negativePrompt}
+              placeholder={t("single.negativePlaceholder")}
+              minRows={4}
+              library={settings.negativePromptLibrary}
+              chooseHistoryLabel={t("single.chooseHistoryPrompt")}
+              saveLabel={t("single.savePrompt")}
+              deleteLabel={t("single.deletePrompt")}
+              onChange={(value) => onSettingsChange({ ...settings, negativePrompt: value })}
+              onChoosePrompt={props.onChoosePrompt}
+              onSavePrompt={props.onSavePrompt}
+              onDeletePrompt={props.onDeletePrompt}
+            />
             <div className="generation-params-grid">
-              <Select
-                label={t("single.size")}
-                value={settings.size}
-                data={[
-                  { value: "1024x1024", label: "1024x1024" },
-                  { value: "1536x1024", label: "1536x1024" },
-                  { value: "1024x1536", label: "1024x1536" },
-                  { value: "auto", label: "auto" },
-                ]}
-                onChange={(value) => value && props.onSettingsChange({ ...settings, size: value })}
-                allowDeselect={false}
-              />
-              <Select
-                label={t("single.quality")}
-                value={settings.quality}
-                data={[
-                  { value: "auto", label: "auto" },
-                  { value: "low", label: "low" },
-                  { value: "medium", label: "medium" },
-                  { value: "high", label: "high" },
-                ]}
-                onChange={(value) => value && props.onSettingsChange({ ...settings, quality: value })}
-                allowDeselect={false}
-              />
-              <Select
-                label={t("single.outputFormat")}
-                value={settings.outputFormat}
-                data={isGemini
-                  ? [
-                      { value: "png", label: "png" },
-                      { value: "jpeg", label: "jpeg" },
-                      { value: "webp", label: "webp" },
-                    ]
-                  : [
-                      { value: "png", label: "png" },
-                      { value: "jpeg", label: "jpeg" },
-                      { value: "webp", label: "webp" },
-                    ]}
-                onChange={(value) => value && props.onSettingsChange({ ...settings, outputFormat: value })}
-                allowDeselect={false}
-              />
-              {!isGemini && (
-                <NumberInput
-                  label={t("single.outputCompression")}
-                  value={settings.outputCompression}
-                  min={0}
-                  max={100}
-                  allowDecimal={false}
-                  onChange={(value) => props.onSettingsChange({ ...settings, outputCompression: Math.max(0, Math.min(100, Number(value) || 0)) })}
-                />
-              )}
-              <Select
-                label={t("single.moderation")}
-                value={settings.moderation}
-                data={[
-                  { value: "auto", label: "auto" },
-                  { value: "low", label: "low" },
-                ]}
-                onChange={(value) => value && props.onSettingsChange({ ...settings, moderation: value as Settings["moderation"] })}
-                allowDeselect={false}
-              />
-              {!isGemini && (
-                <Select
-                  label={t("single.background")}
-                  value={settings.background}
-                  data={[
-                    { value: "auto", label: t("single.backgroundAuto") },
-                    { value: "transparent", label: t("single.backgroundTransparent") },
-                    { value: "opaque", label: t("single.backgroundOpaque") },
-                  ]}
-                  onChange={(value) => value && props.onSettingsChange({ ...settings, background: value as Settings["background"] })}
-                  allowDeselect={false}
-                />
-              )}
-              <NumberInput
-                label={t("single.timeoutSec")}
-                value={settings.timeoutSec}
-                min={10}
-                max={1200}
-                allowDecimal={false}
-                onChange={(value) => props.onSettingsChange({ ...settings, timeoutSec: Math.max(10, Number(value) || 10) })}
-              />
-              <NumberInput
-                label={t("single.imageCount")}
-                value={settings.n}
-                min={1}
-                max={4}
-                allowDecimal={false}
-                onChange={(value) => props.onSettingsChange({ ...settings, n: Math.max(1, Math.min(4, Number(value) || 1)) })}
-              />
+              {generationParamControls.map((control) => {
+                if (control.visible === false) return null;
+                if (control.type === "select") {
+                  return (
+                    <Select
+                      key={control.key}
+                      label={control.label}
+                      value={control.value}
+                      data={control.data}
+                      onChange={(value) => value && control.onChange(value)}
+                      allowDeselect={false}
+                    />
+                  );
+                }
+                return (
+                  <NumberInput
+                    key={control.key}
+                    label={control.label}
+                    value={control.value}
+                    min={control.min}
+                    max={control.max}
+                    allowDecimal={false}
+                    onChange={(value) => control.onChange(control.clamp(value))}
+                  />
+                );
+              })}
             </div>
           </section>
         </aside>
 
-        <section className="lab-workspace">
-          <button
-            className={previewSrc ? "preview-stage has-image" : "preview-stage"}
-            disabled={!previewSrc}
-            onClick={() => {
-              if (!previewSrc) return;
-              resetPreviewZoom();
-              setPreviewZoomOpen(true);
-            }}
-            title={previewSrc ? t("single.previewTitle") : undefined}
-          >
-            {previewSrc ? (
-              <span className="preview-stage-frame">
-                <img src={previewSrc} alt={t("single.previewAlt")} />
-              </span>
-            ) : <span>{t("single.previewPlaceholder")}</span>}
-          </button>
-          {multiPreviewItems.length > 1 && (
-            <div className="preview-strip" role="list" aria-label={t("single.previewList")}>
-              {multiPreviewItems.map((item, index) => (
-                <button
-                  key={`${item.slice(0, 48)}-${index}`}
-                  type="button"
-                  className={item === previewSrc ? "preview-strip-item active" : "preview-strip-item"}
-                  onClick={() => props.onPreviewSelect(item)}
-                  title={`${t("single.previewAlt")} #${index + 1}`}
-                >
-                  <img src={item} alt={`${t("single.previewAlt")} #${index + 1}`} />
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="operation-row">
-            <div className="bottom-actions">
-              <Button className={generationBusy ? "stop-action" : "primary-action"} onClick={props.onGenerate}>
-                {generationBusy ? t("single.stopGenerate") : t("single.generate")}
-              </Button>
-              <Button className={saveButtonState === "saved" ? "save-action saved" : "save-action"} disabled={!previewSrc || saveButtonState === "saving"} onClick={props.onSavePreview}>
-                {saveButtonState === "saving" ? t("single.saving") : saveButtonState === "saved" ? t("single.saveSuccess") : saveButtonState === "resave" ? t("single.saveAgain") : t("single.saveImage")}
-              </Button>
-            </div>
-            <div className="save-size-control">
-              <Select
-                value={saveSize}
-                onChange={(value) => value && props.onSaveSizeChange(value)}
-                data={[
-                  { value: "original", label: t("single.originalSize") },
-                  { value: "64x64", label: "64x64" },
-                  { value: "128x128", label: "128x128" },
-                  { value: "256x256", label: "256x256" },
-                  { value: "512x512", label: "512x512" },
-                  { value: "custom", label: t("single.custom") },
-                ]}
-                allowDeselect={false}
-              />
-            </div>
-          </div>
-          {saveSize === "custom" && (
-            <div className="custom-size-row">
-              <span>{t("single.saveSize")}</span>
-              <div className="custom-size">
-                <NumberInput
-                  min={1}
-                  value={customWidth}
-                  onChange={(value) => props.onCustomWidthChange(Number(value) || 1)}
-                  allowDecimal={false}
-                />
-                <span>x</span>
-                <NumberInput
-                  min={1}
-                  value={customHeight}
-                  onChange={(value) => props.onCustomHeightChange(Number(value) || 1)}
-                  allowDecimal={false}
-                />
-              </div>
-            </div>
-          )}
-          <section className="log-panel">
-            <div className={generationBusy ? "timer-pill active" : "timer-pill"}>{t("batch.elapsed", { seconds: elapsedSeconds })}</div>
-            <pre>{logsText}</pre>
-          </section>
-          <section className="history-workspace">
-            {history.length === 0 ? (
-              <div className="history-empty">-</div>
-            ) : history.slice(0, HISTORY_LIMIT).map((item) => (
-              <button key={item.id} className="history-item" onClick={() => props.onApplyHistory(item)} title={item.prompt}>
-                <span>{item.createdAt}</span>
-                <strong>{item.prompt.replace(/\s+/g, " ").slice(0, 80)}</strong>
-                <em>{item.status}</em>
-              </button>
-            ))}
-          </section>
-        </section>
+        <SingleGenerateWorkspace
+          previewSrc={previewSrc}
+          previewList={previewList}
+          generationBusy={generationBusy}
+          saveButtonState={saveButtonState}
+          saveSize={saveSize}
+          customWidth={customWidth}
+          customHeight={customHeight}
+          logsText={logsText}
+          elapsedSeconds={elapsedSeconds}
+          onGenerate={props.onGenerate}
+          onSavePreview={props.onSavePreview}
+          onPreviewSelect={props.onPreviewSelect}
+          onSaveSizeChange={props.onSaveSizeChange}
+          onCustomWidthChange={props.onCustomWidthChange}
+          onCustomHeightChange={props.onCustomHeightChange}
+          onPreviewOpen={() => {
+            if (!previewSrc) return;
+            resetPreviewZoom();
+            setPreviewZoomOpen(true);
+          }}
+          t={t}
+          history={history}
+          onApplyHistory={props.onApplyHistory}
+        />
       </main>
       <Modal
         opened={previewZoomOpen}

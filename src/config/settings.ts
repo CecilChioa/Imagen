@@ -1,5 +1,12 @@
 import { HISTORY_LIMIT } from "./generation";
-import type { ApiProfile, BlpMipmapCount, Locale, Settings } from "../types/app";
+import type {
+  ApiProfile,
+  ApiProvider,
+  ApiSignupProvider,
+  BlpMipmapCount,
+  Locale,
+  Settings,
+} from "../types/app";
 
 export const IMAGE_COUNT_MIN = 1;
 export const IMAGE_COUNT_MAX = 4;
@@ -20,6 +27,22 @@ export const clampOutputCompression = (value: unknown) =>
 
 export const clampBatchConcurrency = (value: unknown) =>
   Math.max(BATCH_CONCURRENCY_MIN, Math.min(BATCH_CONCURRENCY_MAX, Number(value) || BATCH_CONCURRENCY_MIN));
+
+export const apiVersionByProvider: Record<ApiProvider, "v1" | "v1beta"> = {
+  openai_compatible: "v1",
+  gemini_native: "v1beta",
+};
+
+export const providerOptionKeys: Array<{ value: ApiProvider; labelKey: string }> = [
+  { value: "openai_compatible", labelKey: "settings.providerOpenAiCompatible" },
+  { value: "gemini_native", labelKey: "settings.providerGeminiNative" },
+];
+
+export const apiSignupProviders: Array<{ id: ApiSignupProvider; name: string; url: string }> = [
+  { id: "pptokens", name: "PPtokens", url: "https://www.pptoken.org/?promo=AFFNV" },
+  { id: "aifast", name: "速擎智能", url: "https://aifast.site/register?aff=6fbi" },
+  { id: "yunwu", name: "云雾", url: "https://yunwu.ai/register?aff=3QLV" },
+];
 
 export const defaultApiProfile: ApiProfile = {
   id: "default",
@@ -92,7 +115,7 @@ export const normalizeSettings = (raw: Partial<Settings> & { convertBlpMakeMipma
       ...defaultApiProfile,
       ...profile,
       provider,
-      apiVersion: profile.apiVersion || (provider === "gemini_native" ? "v1beta" : "v1"),
+      apiVersion: profile.apiVersion || apiVersionByProvider[provider],
     };
   });
   const active = profiles.find((profile) => profile.id === raw.activeApiProfileId)?.id ?? profiles[0].id;
@@ -100,4 +123,23 @@ export const normalizeSettings = (raw: Partial<Settings> & { convertBlpMakeMipma
   return {
     ...defaultSettings,
     ...raw,
-    timeoutSec: Ma
+    timeoutSec: clampTimeoutSec(raw.timeoutSec ?? defaultSettings.timeoutSec),
+    outputCompression: clampOutputCompression(raw.outputCompression ?? defaultSettings.outputCompression),
+    moderation: raw.moderation === "low" ? "low" : "auto",
+    background: raw.background === "transparent" || raw.background === "opaque" ? raw.background : "auto",
+    language: toLanguage(raw.language),
+    apiProfiles: profiles,
+    activeApiProfileId: active,
+    positivePromptLibrary: raw.positivePromptLibrary ?? [],
+    negativePromptLibrary: raw.negativePromptLibrary ?? [],
+    history: (raw.history ?? []).slice(0, HISTORY_LIMIT),
+    convertBlpMipmapCount: toBlpMipmapCount(raw.convertBlpMipmapCount ?? raw.convertBlpMakeMipmaps),
+    n: clampImageCount(raw.n ?? defaultSettings.n),
+  };
+};
+
+export const createApiProfile = (): ApiProfile => ({
+  ...defaultApiProfile,
+  id: crypto.randomUUID(),
+  name: "New API",
+});

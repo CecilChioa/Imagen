@@ -9,6 +9,7 @@ export type StatusMessage = {
 };
 
 export type ApiProvider = "openai_compatible" | "gemini_native";
+export type ApiSignupProvider = "pptokens" | "aifast" | "yunwu";
 export type ModerationLevel = "auto" | "low";
 export type BackgroundMode = "auto" | "transparent" | "opaque";
 

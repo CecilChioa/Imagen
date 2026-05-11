@@ -1,4 +1,5 @@
 import { GENERATE_LOG_LIMIT, parseBatchPromptLines, resetBoundedLogs } from "../config/generation";
+import { clampBatchConcurrency } from "../config/settings";
 import i18n from "../i18n";
 import { invokeCommand, isCancelledError } from "../lib/tauri";
 import type { BatchItem, GenerationResult } from "../types/app";
@@ -65,7 +66,9 @@ export const useBatchGeneration = ({
     const cancellationId = crypto.randomUUID();
     generationRunIdRef.current = runId;
     activeCancellationIdRef.current = cancellationId;
-    const concurrency = params.batchMode === "concurrent" ? Math.max(1, Math.min(20, params.batchConcurrency || 1)) : 1;
+    const concurrency = params.batchMode === "concurrent" ? clampBatchConcurrency(params.batchConcurrency) : 1;
+
+    const terminalStatusById = new Map<string, BatchItem["statusCode"]>();
 
     const updateBatchItem = (id: string, updater: (item: BatchItem) => BatchItem) => {
       params.setBatchItems((current) => {
@@ -110,12 +113,15 @@ export const useBatchGeneration = ({
           previewDataUrl: dataUrl || currentItem.previewDataUrl,
           error: undefined,
         }));
+        terminalStatusById.set(item.id, "done");
       } catch (error) {
         if (isCancelledError(error)) {
           updateBatchItem(item.id, (currentItem) => ({ ...currentItem, status: "", statusCode: "cancelled", error: undefined }));
+          terminalStatusById.set(item.id, "cancelled");
           return;
         }
         updateBatchItem(item.id, (currentItem) => ({ ...currentItem, status: "", statusCode: "failed", error: String(error) }));
+        terminalStatusById.set(item.id, "failed");
       }
     };
 
@@ -142,9 +148,26 @@ export const useBatchGeneration = ({
         activeCancellationIdRef.current = null;
       }
       if (generationRunIdRef.current === runId) {
+        const terminalStatuses = items.map((item) => terminalStatusById.get(item.id) ?? "pending");
+        const cancelledCount = terminalStatuses.filter((statusCode) => statusCode === "cancelled").length;
+        const failedCount = terminalStatuses.filter((statusCode) => statusCode === "failed").length;
+        const doneCount = terminalStatuses.filter((statusCode) => statusCode === "done").length;
+
+        let nextStatus: { tone: "success" | "warning"; key: string } = {
+          tone: "success",
+          key: "status.batchGenerationCompleted",
+        };
+        if (doneCount === 0 && cancelledCount > 0 && failedCount === 0) {
+          nextStatus = { tone: "warning", key: "status.batchGenerationCancelled" };
+        } else if (doneCount === 0 && failedCount > 0) {
+          nextStatus = { tone: "warning", key: "status.batchGenerationFailed" };
+        } else if (failedCount > 0 || cancelledCount > 0) {
+          nextStatus = { tone: "warning", key: "status.batchGenerationPartiallyCompleted" };
+        }
+
         params.setGenerationBusy(false);
         params.setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-        params.setStatus({ tone: "success", key: "status.batchGenerationCompleted" });
+        params.setStatus(nextStatus);
       }
     }
   };

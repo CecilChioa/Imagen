@@ -181,17 +181,21 @@ pub async fn generate_image(
                 error
             } else {
                 format!(
-                    "Failed to decode response body: {}. HTTP status: {}. Endpoint: {}",
-                    error, status, endpoint
+                    "response_body_decode_failed: {}. http_status: {}. endpoint: {}. content_type: {}",
+                    error, status, endpoint, content_type
                 )
             }
         })?;
 
     if !status.is_success() {
-        let preview = response_preview_bytes(&body);
+        let body_preview = response_preview_bytes(&body);
+        let body_text_preview = String::from_utf8(body.to_vec())
+            .ok()
+            .map(|value| response_preview(&value))
+            .unwrap_or_else(|| "<non-utf8>".into());
         return Err(format!(
-            "API error {}. content-type: {}. body preview: {}",
-            status, content_type, preview
+            "api_http_error: status={}. endpoint={}. content_type={}. body_hex_preview={}. body_text_preview={}",
+            status, endpoint, content_type, body_preview, body_text_preview
         ));
     }
 
@@ -225,9 +229,10 @@ pub async fn generate_image(
 
     let text = String::from_utf8(body.to_vec()).map_err(|e| {
         format!(
-            "API response is neither image nor UTF-8 text: {}. HTTP status: {}. content-type: {}. body preview: {}",
+            "response_utf8_decode_failed: {}. http_status: {}. endpoint: {}. content_type: {}. body_hex_preview: {}",
             e,
             status,
+            endpoint,
             content_type,
             response_preview_bytes(&body)
         )
@@ -235,9 +240,10 @@ pub async fn generate_image(
 
     let payload: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
         format!(
-            "API response is not valid JSON: {}. HTTP status: {}. content-type: {}. body preview: {}",
+            "response_json_parse_failed: {}. http_status: {}. endpoint: {}. content_type: {}. body_text_preview: {}",
             e,
             status,
+            endpoint,
             content_type,
             response_preview(&text)
         )
@@ -466,20 +472,28 @@ async fn extract_openai_outputs(
     let data = payload
         .get("data")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| format!("Unexpected OpenAI response: {}", payload))?;
+        .ok_or_else(|| format!("openai_payload_invalid: missing data array. payload={}", payload))?;
+
+    if data.is_empty() {
+        return Err(format!("openai_payload_empty_data: payload={}", payload));
+    }
 
     let mut outputs = Vec::new();
-    for item in data {
+    for (index, item) in data.iter().enumerate() {
         let bytes = if let Some(b64) = item.get("b64_json").and_then(|v| v.as_str()) {
             base64::engine::general_purpose::STANDARD
                 .decode(b64)
-                .map_err(|e| e.to_string())?
+                .map_err(|e| format!("openai_b64_decode_failed[index={}]: {}", index, e))?
         } else if let Some(url) = item.get("url").and_then(|v| v.as_str()) {
-            let url_response = await_or_cancel(cancellation, client.get(url).send()).await?;
-            let bytes = await_or_cancel(cancellation, url_response.bytes()).await?;
+            let url_response = await_or_cancel(cancellation, client.get(url).send())
+                .await
+                .map_err(|e| format!("openai_url_fetch_failed[index={}]: {}", index, e))?;
+            let bytes = await_or_cancel(cancellation, url_response.bytes())
+                .await
+                .map_err(|e| format!("openai_url_body_decode_failed[index={}]: {}", index, e))?;
             bytes.to_vec()
         } else {
-            return Err(format!("No image payload in OpenAI response: {}", payload));
+            continue;
         };
 
         outputs.push(GeneratedImage {
@@ -493,6 +507,13 @@ async fn extract_openai_outputs(
         });
     }
 
+    if outputs.is_empty() {
+        return Err(format!(
+            "openai_payload_no_supported_image_fields: expected b64_json or url in data entries. payload={}",
+            payload
+        ));
+    }
+
     Ok(outputs)
 }
 
@@ -500,11 +521,15 @@ fn extract_gemini_outputs(payload: &serde_json::Value) -> Result<Vec<GeneratedIm
     let candidates = payload
         .get("candidates")
         .and_then(|value| value.as_array())
-        .ok_or_else(|| format!("Unexpected Gemini response: {}", payload))?;
+        .ok_or_else(|| format!("gemini_payload_invalid: missing candidates array. payload={}", payload))?;
+
+    if candidates.is_empty() {
+        return Err(format!("gemini_payload_empty_candidates: payload={}", payload));
+    }
 
     let mut outputs = Vec::new();
 
-    for candidate in candidates {
+    for (candidate_index, candidate) in candidates.iter().enumerate() {
         if let Some(parts) = candidate
             .get("content")
             .and_then(|content| content.get("parts"))
@@ -567,10 +592,24 @@ fn extract_gemini_outputs(payload: &serde_json::Value) -> Result<Vec<GeneratedIm
                 }
             }
         }
+
+        if candidate
+            .get("finishReason")
+            .and_then(|value| value.as_str())
+            .is_some_and(|reason| reason.eq_ignore_ascii_case("SAFETY"))
+        {
+            return Err(format!(
+                "gemini_candidate_blocked_by_safety[index={}]: payload={}",
+                candidate_index, payload
+            ));
+        }
     }
 
     if outputs.is_empty() {
-        return Err(format!("No image payload in Gemini response: {}", payload));
+        return Err(format!(
+            "gemini_payload_no_image_data: expected inlineData/text.image/text.images/output.bytesBase64Encoded. payload={}",
+            payload
+        ));
     }
 
     Ok(outputs)
@@ -695,15 +734,18 @@ fn response_preview_bytes(body: &[u8]) -> String {
 
     let max = body.len().min(120);
     let mut preview = String::new();
-    for byte in &body[..max] {
+    for (index, byte) in body[..max].iter().enumerate() {
         use std::fmt::Write as _;
         let _ = write!(preview, "{:02x}", byte);
+        if index + 1 < max {
+            preview.push(' ');
+        }
     }
 
     if body.len() > max {
-        format!("{}...", preview)
+        format!("len={} bytes, hex={} ...", body.len(), preview)
     } else {
-        preview
+        format!("len={} bytes, hex={}", body.len(), preview)
     }
 }
 
@@ -712,10 +754,11 @@ fn response_preview(text: &str) -> String {
     if trimmed.is_empty() {
         return "<empty response>".into();
     }
+    let total_chars = trimmed.chars().count();
     let preview: String = trimmed.chars().take(500).collect();
-    if trimmed.chars().count() > 500 {
-        format!("{}...", preview)
+    if total_chars > 500 {
+        format!("len={} chars, text={}...", total_chars, preview)
     } else {
-        preview
+        format!("len={} chars, text={}", total_chars, preview)
     }
 }

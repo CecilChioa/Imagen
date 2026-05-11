@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import i18n from "../i18n";
 import { chooseDirectory } from "../lib/filePickers";
 import { invokeCommand } from "../lib/tauri";
-import type { ApiProfile, Settings, StatusMessage } from "../types/app";
-
+import { apiVersionByProvider } from "../config/settings";
+import type { ApiProfile, ApiSignupProvider, Settings, StatusMessage } from "../types/app";
 type Params = {
   settings: Settings;
   draftSettings: Settings;
@@ -30,7 +30,7 @@ type ReturnValue = {
   deleteProfile: (id: string) => void;
   onChooseOutputDir: () => Promise<void>;
   onSaveAllSettings: () => Promise<void>;
-  onOpenApiSignup: (provider: "pptokens" | "aifast" | "yunwu") => Promise<void>;
+  onOpenApiSignup: (provider: ApiSignupProvider) => Promise<void>;
   onConnectLocalModel: () => void;
 };
 
@@ -111,7 +111,7 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
     params.setStatus({ tone: "success", key: "status.settingsSaved" });
   };
 
-  const onOpenApiSignup = async (provider: "pptokens" | "aifast" | "yunwu") => {
+  const onOpenApiSignup = async (provider: ApiSignupProvider) => {
     try {
       await invokeCommand("open_api_signup_url", { provider });
     } catch (error) {
@@ -125,7 +125,7 @@ export function useProfilesAndPrompts(params: Params): ReturnValue {
       ...profile,
       name: params.localModelName.trim() || i18n.t("settings.localModelDefaultName"),
       provider: "openai_compatible" as const,
-      apiVersion: "v1",
+      apiVersion: apiVersionByProvider.openai_compatible,
       apiBaseUrl: params.localModelBaseUrl.trim() || "http://127.0.0.1:11434/v1",
       model: params.localModelId.trim() || "llava",
       apiKey: "",

@@ -11,6 +11,7 @@ import { SingleGeneratePage } from "../pages/SingleGeneratePage";
 import type {
   AlphaMode,
   ApiProfile,
+  ApiSignupProvider,
   BatchItem,
   BatchMode,
   BlpAlphaBits,
@@ -173,7 +174,7 @@ type SettingsActionProps = {
   onDeleteProfile: (id: string) => void;
   onChooseOutputDir: () => Promise<void>;
   onSaveAllSettings: () => Promise<void>;
-  onOpenApiSignup: (provider: "pptokens" | "aifast" | "yunwu") => Promise<void>;
+  onOpenApiSignup: (provider: ApiSignupProvider) => Promise<void>;
   onConnectLocalModel: () => void;
 };
 
