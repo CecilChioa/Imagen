@@ -1,7 +1,7 @@
 {
   "name": "imagen",
   "private": true,
-  "version": "1.4.8",
+  "version": "v1.4.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
