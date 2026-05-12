@@ -1,9 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 
-const version = process.argv[2];
+let version = process.argv[2];
 if (!version) {
   console.error("Missing version.");
+  process.exit(1);
+}
+
+version = version.replace(/^v/i, "");
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+  console.error("Version must be a semver string without v prefix, for example 1.4.8.");
   process.exit(1);
 }
 

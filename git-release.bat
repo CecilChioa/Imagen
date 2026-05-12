@@ -24,11 +24,18 @@ if not exist ".github\workflows\build-release.yml" (
 )
 
 for /f "usebackq delims=" %%v in (`powershell -NoProfile -Command "(Get-Content -Raw package.json | ConvertFrom-Json).version"`) do set CURRENT_VERSION=%%v
+if /i "%CURRENT_VERSION:~0,1%"=="v" set CURRENT_VERSION=%CURRENT_VERSION:~1%
 echo Current version: %CURRENT_VERSION%
 echo.
 
 set /p RELEASE_VERSION=Enter release version without v prefix ^(press Enter to keep current^): 
 if "%RELEASE_VERSION%"=="" set RELEASE_VERSION=%CURRENT_VERSION%
+if /i "%RELEASE_VERSION:~0,1%"=="v" set RELEASE_VERSION=%RELEASE_VERSION:~1%
+powershell -NoProfile -Command "if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { exit 1 }"
+if errorlevel 1 (
+  echo Release version must be a semver string without v prefix, for example 1.4.8.
+  goto failed
+)
 set RELEASE_TAG=v%RELEASE_VERSION%
 
 echo.
